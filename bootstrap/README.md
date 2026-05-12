@@ -1,6 +1,6 @@
 # State bootstrap
 
-Creates the per-environment S3 buckets and DynamoDB lock tables that hold Terraform/Terragrunt state for the rest of the platform. Run once per fork, before any other apply, and tear down after the platform itself is destroyed.
+Creates the per-environment S3 buckets that hold Terraform/Terragrunt state — and the native S3 lockfile that serializes concurrent applies — for the rest of the platform. Run once per fork, before any other apply, and tear down after the platform itself is destroyed.
 
 ## Why a separate configuration
 
@@ -11,7 +11,8 @@ Terraform state lives in the S3 buckets created here. The bucket cannot store th
 For each environment in `var.environments` (default: `dev`, `prod`):
 
 - **S3 bucket** `${aws_account_id}-${project}-${environment}-tfstate` — versioned, encrypted at rest with SSE-S3 (AES256), all four public-access blocks enabled, `force_destroy = true` for clean teardown.
-- **DynamoDB table** `${project}-${environment}-tflock` — pay-per-request billing, schema for Terragrunt state locking.
+
+State locking is handled by Terraform's S3-native lockfile mechanism (`use_lockfile = true` in the Terragrunt backend config). Concurrent applies are serialized by an S3 conditional-write lock object that lives next to the state file in the same bucket, so no separate DynamoDB table is required.
 
 The bucket name embeds the AWS account ID so this configuration can be applied to any AWS account without manual renaming — the global-uniqueness requirement of S3 is satisfied automatically.
 

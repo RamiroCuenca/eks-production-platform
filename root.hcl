@@ -72,16 +72,19 @@ generate "versions" {
   EOF
 }
 
-# Remote state — S3 with DynamoDB locking.
+# Remote state — S3 with native S3 lockfile locking.
 #
 # State primitives are scoped per-environment (not per-region) and live in
 # ap-northeast-1, the primary region; modules deployed to ap-northeast-2
 # access them cross-region with negligible latency.
 #
+# `use_lockfile = true` opts into Terraform's S3-native locking
+# (Terraform >= 1.10), which uses an S3 conditional-write object as the lock
+# instead of a separate DynamoDB table. The state bucket is provisioned by
+# the standalone Terraform configuration under bootstrap/.
+#
 # The bucket name embeds the AWS account ID so a fork using a different
 # account naturally gets a globally unique S3 name without manual renaming.
-# Both the bucket and the DynamoDB lock table are provisioned by the
-# standalone Terraform configuration under bootstrap/.
 remote_state {
   backend = "s3"
 
@@ -91,11 +94,11 @@ remote_state {
   }
 
   config = {
-    bucket         = "${local.aws_account_id}-${local.project}-${local.environment}-tfstate"
-    key            = "${path_relative_to_include()}/terraform.tfstate"
-    region         = "ap-northeast-1"
-    encrypt        = true
-    dynamodb_table = "${local.project}-${local.environment}-tflock"
+    bucket       = "${local.aws_account_id}-${local.project}-${local.environment}-tfstate"
+    key          = "${path_relative_to_include()}/terraform.tfstate"
+    region       = "ap-northeast-1"
+    encrypt      = true
+    use_lockfile = true
   }
 }
 
