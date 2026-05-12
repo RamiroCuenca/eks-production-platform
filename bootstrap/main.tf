@@ -62,21 +62,7 @@ resource "aws_s3_bucket_public_access_block" "tfstate" {
   restrict_public_buckets = true
 }
 
-# DynamoDB table for Terragrunt state locking. Pay-per-request avoids idle
-# cost; lock writes are infrequent and small.
-resource "aws_dynamodb_table" "tflock" {
-  for_each = var.environments
-
-  name         = "${var.project}-${each.key}-tflock"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "LockID"
-
-  attribute {
-    name = "LockID"
-    type = "S"
-  }
-
-  tags = {
-    Environment = each.key
-  }
-}
+# State locking is handled by Terraform's S3-native lockfile mechanism
+# (use_lockfile = true in the backend config), so no DynamoDB table is
+# provisioned here. S3 conditional writes serialize concurrent applies
+# directly against a sibling lock object in the same bucket.
