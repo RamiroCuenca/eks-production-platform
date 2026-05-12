@@ -102,9 +102,13 @@ remote_state {
   }
 }
 
-# Pass the merged variable hierarchy to every child module.
+# Pass the merged variable hierarchy to every child module, plus the
+# computed name_prefix so modules don't have to re-stitch project/env/region.
 inputs = merge(
   local.global_vars.locals,
   local.account_vars.locals,
   local.region_vars.locals,
+  {
+    name_prefix = local.name_prefix
+  },
 )
