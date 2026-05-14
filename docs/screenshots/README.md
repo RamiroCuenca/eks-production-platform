@@ -7,4 +7,4 @@ one-line caption per image — what the screenshot proves about the design.
 | Module | Captured |
 |---|---|
 | [network/](network/) | VPC, subnets, NAT gateways, flow logs |
-| [eks/](eks/) | _pending_ |
+| [eks/](eks/) | Cluster overview, encryption, logging, networking, access entries, compute, OIDC provider, Karpenter IAM roles |
