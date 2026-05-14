@@ -67,6 +67,10 @@ generate "versions" {
           source  = "hashicorp/aws"
           version = "~> 6.43"
         }
+        tls = {
+          source  = "hashicorp/tls"
+          version = "~> 4.1"
+        }
       }
     }
   EOF

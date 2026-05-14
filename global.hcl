@@ -11,6 +11,13 @@ locals {
   # Loaded from the shell at apply time so the ID stays out of git history.
   aws_account_id = get_env("AWS_ACCOUNT_ID", "")
 
+  # Operator IAM principal that receives the cluster-admin access entry on
+  # every EKS cluster. Loaded from the shell at apply time. If empty, the EKS
+  # module falls back to the IAM identity running `terraform apply` (via
+  # `aws_caller_identity`) — convenient for local-only workflows but unsafe
+  # once CI also runs apply, so export the env var before that lands.
+  operator_iam_arn = get_env("OPERATOR_IAM_ARN", "")
+
   common_tags = {
     Project    = "eks-platform"
     Owner      = "RamiroCuenca"
