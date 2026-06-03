@@ -55,8 +55,13 @@ output "karpenter_node_role_arn" {
   value       = aws_iam_role.karpenter_node.arn
 }
 
+output "karpenter_node_role_name" {
+  description = "IAM role NAME (not ARN) that Karpenter-launched EC2 instances assume. Karpenter v1's EC2NodeClass.spec.role takes a role name; Karpenter manages the instance profile itself, so the gitops chart only needs the name."
+  value       = aws_iam_role.karpenter_node.name
+}
+
 output "karpenter_node_instance_profile_name" {
-  description = "Instance profile name referenced by Karpenter's EC2NodeClass `role:` field."
+  description = "Instance profile name referenced by Karpenter's EC2NodeClass `role:` field on Karpenter v0.x. Retained for backwards compatibility; v1+ uses karpenter_node_role_name instead."
   value       = aws_iam_instance_profile.karpenter_node.name
 }
 

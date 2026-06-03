@@ -71,6 +71,18 @@ generate "versions" {
           source  = "hashicorp/tls"
           version = "~> 4.1"
         }
+        # Cluster-touching providers. Declared centrally so every module gets
+        # consistent version pinning; only configured (and only authenticated
+        # against the cluster) inside modules that actually use them — today,
+        # only modules/argocd/. Declaration alone causes no cluster connection.
+        helm = {
+          source  = "hashicorp/helm"
+          version = "~> 2.17"
+        }
+        kubernetes = {
+          source  = "hashicorp/kubernetes"
+          version = "~> 2.35"
+        }
       }
     }
   EOF
