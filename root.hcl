@@ -71,6 +71,28 @@ generate "versions" {
           source  = "hashicorp/tls"
           version = "~> 4.1"
         }
+        # Cluster-touching providers. Declared centrally so every module gets
+        # consistent version pinning; only configured (and only authenticated
+        # against the cluster) inside modules that actually use them — today,
+        # only modules/argocd/. Declaration alone causes no cluster connection.
+        helm = {
+          source  = "hashicorp/helm"
+          version = "~> 2.17"
+        }
+        kubernetes = {
+          source  = "hashicorp/kubernetes"
+          version = "~> 2.35"
+        }
+        # gavinbunney/kubectl applies arbitrary manifests without requiring
+        # the CRD to exist at plan time — the standard escape hatch for
+        # bootstrapping an Application or other CRD-typed resource in the
+        # same apply that installs its CRD. Same configured-vs-declared rule
+        # as helm/kubernetes: declared centrally, configured only in
+        # modules/argocd/providers.tf.
+        kubectl = {
+          source  = "gavinbunney/kubectl"
+          version = "~> 1.19"
+        }
       }
     }
   EOF
