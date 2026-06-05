@@ -83,6 +83,16 @@ generate "versions" {
           source  = "hashicorp/kubernetes"
           version = "~> 2.35"
         }
+        # gavinbunney/kubectl applies arbitrary manifests without requiring
+        # the CRD to exist at plan time — the standard escape hatch for
+        # bootstrapping an Application or other CRD-typed resource in the
+        # same apply that installs its CRD. Same configured-vs-declared rule
+        # as helm/kubernetes: declared centrally, configured only in
+        # modules/argocd/providers.tf.
+        kubectl = {
+          source  = "gavinbunney/kubectl"
+          version = "~> 1.19"
+        }
       }
     }
   EOF

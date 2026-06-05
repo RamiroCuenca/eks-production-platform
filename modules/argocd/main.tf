@@ -173,16 +173,27 @@ resource "kubernetes_secret" "cluster" {
 #
 # `directory.recurse = true` so subdirectories under apps/ also get picked
 # up as additional ApplicationSets land.
+#
+# Created via the kubectl provider rather than hashicorp/kubernetes's
+# kubernetes_manifest: the Application CRD is installed by the ArgoCD Helm
+# chart in the same apply, and kubernetes_manifest would fail the plan
+# because it validates manifests against their CRD schemas before apply.
+# kubectl_manifest defers validation to apply time, which is the canonical
+# bootstrap pattern for any in-cluster resource whose CRD is installed by
+# the same Terraform run.
 
-resource "kubernetes_manifest" "root_application" {
-  manifest = {
+resource "kubectl_manifest" "root_application" {
+  server_side_apply = true
+
+  yaml_body = yamlencode({
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "Application"
     metadata = {
       name      = "root"
       namespace = kubernetes_namespace.argocd.metadata[0].name
-      # Recommended on the App-of-Apps root so ArgoCD doesn't prune children
-      # on a root delete — children own their own resources' lifecycle.
+      # Empty finalizers list on the App-of-Apps root so a `kubectl delete
+      # application root` doesn't cascade-prune every child; children own
+      # their own resources' lifecycle through their own finalizers.
       finalizers = []
     }
     spec = {
@@ -210,7 +221,7 @@ resource "kubernetes_manifest" "root_application" {
         ]
       }
     }
-  }
+  })
 
   depends_on = [helm_release.argocd]
 }

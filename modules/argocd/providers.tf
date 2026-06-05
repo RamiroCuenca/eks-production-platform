@@ -41,3 +41,21 @@ provider "helm" {
     }
   }
 }
+
+# kubectl provider: applies the root ArgoCD Application via server-side apply
+# without validating the manifest's schema at plan time. The Application CRD
+# is installed by the ArgoCD Helm chart in the same apply; hashicorp/kubernetes
+# would fail the plan because the CRD doesn't exist yet. `load_config_file =
+# false` prevents the provider from reading the local kubeconfig — the apply
+# must be reproducible from any environment that has AWS credentials.
+provider "kubectl" {
+  host                   = data.aws_eks_cluster.this.endpoint
+  cluster_ca_certificate = base64decode(data.aws_eks_cluster.this.certificate_authority[0].data)
+  load_config_file       = false
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", var.cluster_name, "--region", var.aws_region]
+  }
+}
