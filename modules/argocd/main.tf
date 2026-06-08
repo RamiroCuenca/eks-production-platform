@@ -18,23 +18,33 @@
 # the gitops repo.
 
 locals {
-  # Carried into the cluster Secret as a label so gitops ApplicationSets can
-  # target environments selectively (e.g. matchLabels: { env: dev }).
+  # Labels drive selector matching: gitops ApplicationSets use
+  # matchLabels: { argocd.argoproj.io/secret-type: cluster } to find this
+  # Secret, and env/region are available as targeting axes if some
+  # ApplicationSet wants to apply only to dev or only to ap-northeast-1.
   cluster_secret_labels = {
     "argocd.argoproj.io/secret-type" = "cluster"
     env                              = var.environment
     region                           = var.aws_region
   }
 
-  # Per-cluster facts injected into ApplicationSets at render time via
-  # {{ .values.* }}. Everything here is something only Terraform can know
-  # (it owns the AWS resources the values refer to).
-  cluster_secret_values = {
-    clusterName                = var.cluster_name
-    awsRegion                  = var.aws_region
-    karpenterControllerRoleArn = var.karpenter_controller_role_arn
-    karpenterNodeRoleName      = var.karpenter_node_role_name
-    karpenterInterruptionQueue = var.karpenter_interruption_queue_name
+  # Per-cluster facts injected into ApplicationSet templates at render
+  # time. Stored as ANNOTATIONS because ArgoCD's cluster generator only
+  # exposes labels and annotations from the cluster Secret to the template
+  # — anything stashed in data.config (where the v1 of this module put it)
+  # is parsed as connection config and silently dropped. ARNs contain ':'
+  # and '/' which are illegal in label values, so the whole bundle lives
+  # in annotations for consistency.
+  #
+  # The gitops repo's ApplicationSets dereference these via a generator
+  # `values` block (one place, one time) so the chart template body stays
+  # readable with {{ .values.* }} references.
+  cluster_secret_annotations = {
+    "platform.io/cluster-name"                  = var.cluster_name
+    "platform.io/aws-region"                    = var.aws_region
+    "platform.io/karpenter-controller-role-arn" = var.karpenter_controller_role_arn
+    "platform.io/karpenter-node-role-name"      = var.karpenter_node_role_name
+    "platform.io/karpenter-interruption-queue"  = var.karpenter_interruption_queue_name
   }
 }
 
@@ -71,6 +81,18 @@ resource "helm_release" "argocd" {
 }
 
 locals {
+  # The system MNG carries a `node-tier=system:NoSchedule` taint to keep
+  # application workloads off it. Every cluster-critical component — ArgoCD
+  # included — must tolerate the taint or stay Pending on a fresh cluster
+  # where no untainted nodes exist yet. Centralised here so the value is
+  # reused in both global and per-component blocks below.
+  system_toleration = {
+    key      = "node-tier"
+    operator = "Equal"
+    value    = "system"
+    effect   = "NoSchedule"
+  }
+
   argocd_values = merge(
     {
       global = {
@@ -88,6 +110,22 @@ locals {
             }
           }
         }
+        # Inherited by every long-running component (server, controller,
+        # repo-server, applicationset, notifications, dex).
+        tolerations = [local.system_toleration]
+      }
+      # The redis-secret-init pre-install Helm hook does NOT inherit
+      # global.tolerations in chart 7.8.x — its template references
+      # `.Values.redisSecretInit.tolerations` directly. Must be set
+      # explicitly or the helm install hangs forever waiting for the hook
+      # pod to schedule. Same for the redis Deployment itself: per-component
+      # tolerations override (rather than merge with) global, so we set it
+      # explicitly to be safe.
+      redisSecretInit = {
+        tolerations = [local.system_toleration]
+      }
+      redis = {
+        tolerations = [local.system_toleration]
       }
       configs = {
         # Public UI is intentionally disabled — only port-forwarded admin
@@ -95,6 +133,29 @@ locals {
         # journal: AWS LB Controller + OIDC SSO.
         params = {
           "server.insecure" = false
+        }
+        # Cluster-wide diff customisations applied to every Application.
+        # Lives in the argocd-cm ConfigMap, so adding a new chart never
+        # has to repeat these workarounds.
+        cm = {
+          # Kubernetes 1.33+ added `.status.terminatingReplicas` on
+          # Deployments and ReplicaSets (KEP-3973). ArgoCD 2.14.x ships
+          # an OpenAPI schema that predates that field, so its structured
+          # merge diff (triggered by ServerSideApply=true) refuses to
+          # build a typed value from the live resource and emits:
+          #   "field not declared in schema"
+          # The field is owned by kube-controller-manager — ArgoCD never
+          # writes it — so ignoring it has no operational effect. The
+          # proper fix is to bump ArgoCD to a release whose bundled
+          # schema knows the field; tracked for the next upgrade window.
+          "resource.customizations.ignoreDifferences.apps_Deployment" = <<-EOT
+            jsonPointers:
+              - /status/terminatingReplicas
+          EOT
+          "resource.customizations.ignoreDifferences.apps_ReplicaSet" = <<-EOT
+            jsonPointers:
+              - /status/terminatingReplicas
+          EOT
         }
       }
       server = {
@@ -141,9 +202,10 @@ locals {
 
 resource "kubernetes_secret" "cluster" {
   metadata {
-    name      = var.cluster_name
-    namespace = kubernetes_namespace.argocd.metadata[0].name
-    labels    = local.cluster_secret_labels
+    name        = var.cluster_name
+    namespace   = kubernetes_namespace.argocd.metadata[0].name
+    labels      = local.cluster_secret_labels
+    annotations = local.cluster_secret_annotations
   }
 
   type = "Opaque"
@@ -152,13 +214,13 @@ resource "kubernetes_secret" "cluster" {
     # ArgoCD's required cluster-Secret fields.
     name   = var.cluster_name
     server = "https://kubernetes.default.svc"
-    # `config` carries cluster connection metadata AND the values block the
-    # gitops ApplicationSets read via {{ .values.* }}.
+    # `config` is reserved for connection metadata only (TLS, exec auth,
+    # bearer tokens). Per-cluster template values live on the Secret's
+    # annotations — see cluster_secret_annotations above.
     config = jsonencode({
       tlsClientConfig = {
         insecure = false
       }
-      values = local.cluster_secret_values
     })
   }
 
