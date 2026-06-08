@@ -20,6 +20,16 @@ variable "cluster_name" {
   type        = string
 }
 
+variable "cluster_endpoint" {
+  description = "EKS API server endpoint. Passed in via the Terragrunt dependency on the eks module rather than read from a data source — data sources resolve at plan time and would fail on a fresh stack where the cluster doesn't exist yet."
+  type        = string
+}
+
+variable "cluster_certificate_authority_data" {
+  description = "Base64-encoded cluster CA. Same rationale as cluster_endpoint: dependency-passed to avoid plan-time AWS reads against a not-yet-existing cluster."
+  type        = string
+}
+
 variable "karpenter_controller_role_arn" {
   description = "IRSA role ARN annotated onto the Karpenter ServiceAccount by the Karpenter Helm chart in the gitops repo. Propagated via the cluster Secret."
   type        = string

@@ -6,21 +6,22 @@
 # cluster — every other module would fail at provider init time if these
 # blocks were generated globally.
 #
-# Authenticate the cluster providers against the EKS API.
+# Cluster endpoint + CA arrive as input variables sourced from the eks module
+# via the Terragrunt dependency block — NOT via `data "aws_eks_cluster"`. The
+# data source would resolve at plan time and hit AWS directly, failing on a
+# fresh stack where the EKS cluster has not yet been applied. Threading these
+# values through the dependency means Terragrunt's mock_outputs cover plan-all
+# and the real outputs flow in once eks is applied.
 #
-# Using `exec` over a static token from `aws_eks_cluster_auth` because the
-# data-source token has a fixed 15-minute lifetime. A long apply (Helm
-# install of ArgoCD pulls ~10 images, waits for rollout) can outlast that
-# window and start failing mid-apply with 401s. The exec plugin re-mints a
-# token on demand for every API call.
-
-data "aws_eks_cluster" "this" {
-  name = var.cluster_name
-}
+# Authentication uses `exec` over a static token from `aws_eks_cluster_auth`
+# because the data-source token has a fixed 15-minute lifetime. A long apply
+# (Helm install of ArgoCD pulls ~10 images, waits for rollout) can outlast
+# that window and start failing mid-apply with 401s. The exec plugin re-mints
+# a token on demand for every API call.
 
 provider "kubernetes" {
-  host                   = data.aws_eks_cluster.this.endpoint
-  cluster_ca_certificate = base64decode(data.aws_eks_cluster.this.certificate_authority[0].data)
+  host                   = var.cluster_endpoint
+  cluster_ca_certificate = base64decode(var.cluster_certificate_authority_data)
 
   exec {
     api_version = "client.authentication.k8s.io/v1"
@@ -31,8 +32,8 @@ provider "kubernetes" {
 
 provider "helm" {
   kubernetes {
-    host                   = data.aws_eks_cluster.this.endpoint
-    cluster_ca_certificate = base64decode(data.aws_eks_cluster.this.certificate_authority[0].data)
+    host                   = var.cluster_endpoint
+    cluster_ca_certificate = base64decode(var.cluster_certificate_authority_data)
 
     exec {
       api_version = "client.authentication.k8s.io/v1"
@@ -49,8 +50,8 @@ provider "helm" {
 # false` prevents the provider from reading the local kubeconfig — the apply
 # must be reproducible from any environment that has AWS credentials.
 provider "kubectl" {
-  host                   = data.aws_eks_cluster.this.endpoint
-  cluster_ca_certificate = base64decode(data.aws_eks_cluster.this.certificate_authority[0].data)
+  host                   = var.cluster_endpoint
+  cluster_ca_certificate = base64decode(var.cluster_certificate_authority_data)
   load_config_file       = false
 
   exec {
