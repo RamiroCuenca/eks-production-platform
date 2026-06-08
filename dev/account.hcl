@@ -5,8 +5,8 @@ locals {
 
   # EKS Kubernetes version. Kept identical to prod at steady state; dev bumps
   # first during upgrade soak windows so addon compatibility can be validated
-  # before prod follows. Update both account.hcl files together when bumping.
-  cluster_version = "1.35"
+  # before prod follows. Prod follows ~1 week after dev validates clean.
+  cluster_version = "1.36"
 
   # CIDRs that may reach the EKS public API endpoint. Dev is permissive to
   # accommodate the build-screenshot-destroy lifecycle (kubectl from cafes,
