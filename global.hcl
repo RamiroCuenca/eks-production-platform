@@ -18,6 +18,12 @@ locals {
   # once CI also runs apply, so export the env var before that lands.
   operator_iam_arn = get_env("OPERATOR_IAM_ARN", "")
 
+  # GitHub identity trusted by the CI OIDC roles (modules/github-oidc).
+  # Account-wide facts — every environment's github-oidc unit consumes the
+  # same values via root.hcl's merged inputs.
+  github_org  = "RamiroCuenca"
+  github_repo = "eks-production-platform"
+
   common_tags = {
     Project    = "eks-platform"
     Owner      = "RamiroCuenca"
