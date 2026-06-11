@@ -21,3 +21,10 @@ shots as each pipeline ships.
 |---|---|
 | `03-iam-ci-role-boundary.png` | `eks-platform-ci-dev-boundary` policy JSON, top: the `PermissionsCeiling` Allow (a boundary grants nothing by itself) and `DenyOutsideAllowedRegions` pinning all regional actions to `ap-northeast-1` / `ap-northeast-2` via `aws:RequestedRegion`. |
 | `03b-iam-ci-role-boundary-denies.png` | Same policy, continued: `DenyLongLivedCredentials` (no IAM users, access keys, or login profiles minted from CI), `DenyAccountAliasChanges`, and `DenyKmsKeyDestruction` — the categories no attached policy can ever re-enable. |
+
+## Secrets scanning gate (gitleaks)
+
+| File | What it proves |
+|---|---|
+| `04-gitleaks-fail.png` | The gate firing during a live canary test: a fake AWS access key committed to the PR branch is caught by the full-history scan — rule `aws-access-token` identified, the secret itself `REDACTED` in the log output, file/commit/fingerprint pinpointed, job exits 1 and fails the check. |
+| `05-gitleaks-pass.png` | The same workflow green after the canary was removed by **history rewrite**. A plain revert commit would have stayed red — the credential would still be live in git history — so the full-history posture forces the honest remediation, not a cosmetic one. |
