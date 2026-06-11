@@ -29,6 +29,13 @@ shots as each pipeline ships.
 | `04-gitleaks-fail.png` | The gate firing during a live canary test: a fake AWS access key committed to the PR branch is caught by the full-history scan — rule `aws-access-token` identified, the secret itself `REDACTED` in the log output, file/commit/fingerprint pinpointed, job exits 1 and fails the check. |
 | `05-gitleaks-pass.png` | The same workflow green after the canary was removed by **history rewrite**. A plain revert commit would have stayed red — the credential would still be live in git history — so the full-history posture forces the honest remediation, not a cosmetic one. |
 
+## SAST gate (semgrep)
+
+| File | What it proves |
+|---|---|
+| `08-semgrep-fail.png` | The gate failing its very first CI run on a real finding, not a staged one: `p/terraform` flagged `map_public_ip_on_launch = true` on the public subnets — a default-open setting the Trivy gate had not caught, concrete evidence for running overlapping scanners with different rule coverage. |
+| `08b-semgrep-pass.png` | The same job green after the fix landed — the attribute was removed rather than suppressed, since nothing launched in public subnets needs an auto-assigned address (NAT gateways use EIPs, load balancers attach their own). 108 rules across Terraform, workflow, and Dockerfile packs, 0 findings. |
+
 ## Terraform pipeline + OIDC federation in action
 
 | File | What it proves |
