@@ -5,8 +5,9 @@
 # Constraints mirror root.hcl's pins so standalone validation resolves the
 # same provider majors the platform runs (helm 3.x changed the provider
 # block syntax, so a bare floor would validate against the wrong API). When
-# instantiated through Terragrunt, root.hcl generates a versions.tf over
-# this file and remains the single source of truth.
+# instantiated through Terragrunt, root.hcl's generate block (if_exists =
+# "overwrite") replaces this file with the platform-wide pins, which remain
+# the single source of truth.
 terraform {
   required_providers {
     helm = {
