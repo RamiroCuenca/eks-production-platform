@@ -29,14 +29,15 @@ resource "aws_internet_gateway" "main" {
 
 # Public subnets — internet-facing; load balancers and NAT gateways live here.
 # kubernetes.io/role/elb tag lets the AWS Load Balancer Controller discover them
-# for internet-facing Service/Ingress objects.
+# for internet-facing Service/Ingress objects. Public IPs are never auto-assigned:
+# NAT gateways use EIPs and internet-facing LBs attach their own public addresses,
+# so anything launched here only becomes reachable by explicit address assignment.
 resource "aws_subnet" "public" {
   for_each = local.public_subnets
 
-  vpc_id                  = aws_vpc.main.id
-  availability_zone       = each.key
-  cidr_block              = each.value
-  map_public_ip_on_launch = true
+  vpc_id            = aws_vpc.main.id
+  availability_zone = each.key
+  cidr_block        = each.value
 
   tags = {
     Name                     = "${var.name_prefix}-public-${each.key}"
