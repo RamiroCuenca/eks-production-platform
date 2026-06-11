@@ -1,0 +1,20 @@
+# Automated dependency updates.
+#
+# Scope is deliberately github-actions only. The Terraform provider pins
+# live in root.hcl generate blocks, which Dependabot cannot parse (it has
+# no Terragrunt support) — it would instead bump the per-module versions.tf
+# constraints, which must mirror the root pins' majors, drifting them from
+# the actual source of truth. Module sources are local paths with nothing
+# else to update. Provider pins, the terraform/terragrunt/gitleaks/trivy
+# binary pins, and the semgrep image digest are bumped manually, where the
+# checksum verification forces a look at what actually changed.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"

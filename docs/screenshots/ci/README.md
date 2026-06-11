@@ -36,6 +36,12 @@ shots as each pipeline ships.
 | `08-semgrep-fail.png` | The gate failing its very first CI run on a real finding, not a staged one: `p/terraform` flagged `map_public_ip_on_launch = true` on the public subnets — a default-open setting the Trivy gate had not caught, concrete evidence for running overlapping scanners with different rule coverage. |
 | `08b-semgrep-pass.png` | The same job green after the fix landed — the attribute was removed rather than suppressed, since nothing launched in public subnets needs an auto-assigned address (NAT gateways use EIPs, load balancers attach their own). 108 rules across Terraform, workflow, and Dockerfile packs, 0 findings. |
 
+## Dependency hygiene (Dependabot)
+
+| File | What it proves |
+|---|---|
+| `19-dependabot-settings.png` | Advanced Security settings with the full Dependabot stack enabled — dependency graph, vulnerability alerts, and automated security updates — alongside the committed version-update config that keeps the SHA-pinned workflow actions current. Captured on the gitops repo; both repositories carry the same configuration. |
+
 ## Terraform pipeline + OIDC federation in action
 
 | File | What it proves |
