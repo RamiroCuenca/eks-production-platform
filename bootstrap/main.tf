@@ -39,6 +39,12 @@ resource "aws_s3_bucket_versioning" "tfstate" {
   }
 }
 
+# SSE-S3 (AES256) instead of a customer-managed KMS key is deliberate:
+# encryption at rest is still enforced, and a CMK would add monthly key cost
+# plus key-policy management with no compliance driver at this scope. State
+# access is already gated by IAM and the public-access block. Revisit if
+# state ever needs audited key usage (CloudTrail per-decrypt logging).
+#trivy:ignore:AVD-AWS-0132
 resource "aws_s3_bucket_server_side_encryption_configuration" "tfstate" {
   for_each = var.environments
 

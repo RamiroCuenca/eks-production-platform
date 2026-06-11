@@ -92,8 +92,14 @@ resource "aws_eks_cluster" "this" {
   vpc_config {
     subnet_ids              = local.subnet_ids
     endpoint_private_access = true
-    endpoint_public_access  = true
-    public_access_cidrs     = var.api_public_access_cidrs
+    # Public endpoint is deliberate: operator access during the
+    # build-screenshot-destroy lifecycle comes from changing networks, and a
+    # private-only endpoint would require a standing bastion or VPN. The API
+    # is still IAM-authenticated via access entries, and prod narrows
+    # public_access_cidrs to operator + CI ranges (see prod/account.hcl).
+    #trivy:ignore:AVD-AWS-0040
+    endpoint_public_access = true
+    public_access_cidrs    = var.api_public_access_cidrs
   }
 
   # Envelope encryption for Kubernetes Secrets. One-way switch.

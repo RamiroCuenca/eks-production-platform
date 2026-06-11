@@ -1,0 +1,15 @@
+# Trivy configuration, read automatically by `trivy config .` — keeps local
+# runs and CI byte-identical.
+#
+# HIGH/CRITICAL block the build; lower severities still print in the output
+# for visibility without gating. Carve-outs are inline `trivy:ignore`
+# comments scoped to the exact resource, with the justification alongside —
+# see bootstrap/main.tf (state-bucket SSE-S3) and modules/eks/main.tf
+# (public API endpoint).
+exit-code: 1
+severity:
+  - HIGH
+  - CRITICAL
+scan:
+  skip-dirs:
+    - "**/.terragrunt-cache"
