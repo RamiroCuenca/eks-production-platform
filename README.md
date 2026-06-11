@@ -1,6 +1,10 @@
 # eks-production-platform
 Production-grade EKS platform with GitOps, DevSecOps, and full observability on AWS using Terragrunt and ArgoCD.
 
+[![terraform](https://github.com/RamiroCuenca/eks-production-platform/actions/workflows/terraform.yml/badge.svg?branch=main)](https://github.com/RamiroCuenca/eks-production-platform/actions/workflows/terraform.yml)
+[![sast](https://github.com/RamiroCuenca/eks-production-platform/actions/workflows/sast.yml/badge.svg?branch=main)](https://github.com/RamiroCuenca/eks-production-platform/actions/workflows/sast.yml)
+[![secrets-scan](https://github.com/RamiroCuenca/eks-production-platform/actions/workflows/secrets-scan.yml/badge.svg?branch=main)](https://github.com/RamiroCuenca/eks-production-platform/actions/workflows/secrets-scan.yml)
+
 ---
 
 ## Why this project — and why these specific design choices
