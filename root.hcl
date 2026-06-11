@@ -55,9 +55,16 @@ generate "provider" {
 }
 
 # Terraform / provider version constraints, generated into every module.
+#
+# if_exists is plain "overwrite" (not "overwrite_terragrunt") deliberately:
+# modules may ship their own versions.tf so `terraform validate` works on
+# them standalone in CI (required for non-hashicorp providers like
+# gavinbunney/kubectl, whose source can't be inferred). At instantiation the
+# platform-wide pins generated here always replace the module's copy —
+# overwrite_terragrunt would refuse to touch a file it didn't generate.
 generate "versions" {
   path      = "versions.tf"
-  if_exists = "overwrite_terragrunt"
+  if_exists = "overwrite"
   contents  = <<-EOF
     terraform {
       required_version = ">= 1.15.1"

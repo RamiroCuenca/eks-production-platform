@@ -169,12 +169,12 @@ locals {
 
   # Dev posture: single replicas everywhere, no redis-ha. ~150Mi memory total.
   argocd_single_replica_values = {
-    controller          = { replicas = 1 }
-    server              = { replicas = 1 }
-    repoServer          = { replicas = 1 }
-    applicationSet      = { replicas = 1 }
-    redis-ha            = { enabled = false }
-    redis               = { enabled = true }
+    controller     = { replicas = 1 }
+    server         = { replicas = 1 }
+    repoServer     = { replicas = 1 }
+    applicationSet = { replicas = 1 }
+    redis-ha       = { enabled = false }
+    redis          = { enabled = true }
   }
 
   # Prod posture: multi-replica controllers and redis-ha. The chart's own

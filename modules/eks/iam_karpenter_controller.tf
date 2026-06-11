@@ -108,9 +108,9 @@ resource "aws_iam_role_policy" "karpenter_controller" {
         }
       },
       {
-        Sid    = "AllowScopedResourceTagging"
-        Effect = "Allow"
-        Action = "ec2:CreateTags"
+        Sid      = "AllowScopedResourceTagging"
+        Effect   = "Allow"
+        Action   = "ec2:CreateTags"
         Resource = "arn:${data.aws_partition.current.partition}:ec2:${var.aws_region}:*:instance/*"
         Condition = {
           StringEquals = { "aws:ResourceTag/kubernetes.io/cluster/${local.cluster_name}" = "owned" }
@@ -203,20 +203,20 @@ resource "aws_iam_role_policy" "karpenter_controller" {
         Condition = {
           StringEquals = {
             "aws:RequestTag/kubernetes.io/cluster/${local.cluster_name}" = "owned"
-            "aws:RequestTag/topology.kubernetes.io/region"                = var.aws_region
+            "aws:RequestTag/topology.kubernetes.io/region"               = var.aws_region
           }
           StringLike = { "aws:RequestTag/karpenter.k8s.aws/ec2nodeclass" = "*" }
         }
       },
       {
-        Sid    = "AllowScopedInstanceProfileTagActions"
-        Effect = "Allow"
-        Action = "iam:TagInstanceProfile"
+        Sid      = "AllowScopedInstanceProfileTagActions"
+        Effect   = "Allow"
+        Action   = "iam:TagInstanceProfile"
         Resource = "*"
         Condition = {
           StringEquals = {
             "aws:ResourceTag/kubernetes.io/cluster/${local.cluster_name}" = "owned"
-            "aws:ResourceTag/topology.kubernetes.io/region"                = var.aws_region
+            "aws:ResourceTag/topology.kubernetes.io/region"               = var.aws_region
             "aws:RequestTag/kubernetes.io/cluster/${local.cluster_name}"  = "owned"
             "aws:RequestTag/topology.kubernetes.io/region"                = var.aws_region
           }
@@ -238,7 +238,7 @@ resource "aws_iam_role_policy" "karpenter_controller" {
         Condition = {
           StringEquals = {
             "aws:ResourceTag/kubernetes.io/cluster/${local.cluster_name}" = "owned"
-            "aws:ResourceTag/topology.kubernetes.io/region"                = var.aws_region
+            "aws:ResourceTag/topology.kubernetes.io/region"               = var.aws_region
           }
           StringLike = { "aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass" = "*" }
         }

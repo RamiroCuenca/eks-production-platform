@@ -28,3 +28,14 @@ shots as each pipeline ships.
 |---|---|
 | `04-gitleaks-fail.png` | The gate firing during a live canary test: a fake AWS access key committed to the PR branch is caught by the full-history scan — rule `aws-access-token` identified, the secret itself `REDACTED` in the log output, file/commit/fingerprint pinpointed, job exits 1 and fails the check. |
 | `05-gitleaks-pass.png` | The same workflow green after the canary was removed by **history rewrite**. A plain revert commit would have stayed red — the credential would still be live in git history — so the full-history posture forces the honest remediation, not a cosmetic one. |
+
+## Terraform pipeline + OIDC federation in action
+
+| File | What it proves |
+|---|---|
+| `06c-terraform-run-all-green.png` | The full pipeline green on one PR run: validate, changed-unit detection, scoped dev + prod plans, and the Trivy config scan — with the Deployment protection rules panel showing the prod gate was approved by a human four minutes before the prod plan ran. |
+| `15-oidc-token-exchange.png` | The `plan (dev)` job's step list: "Assume ci-dev via OIDC" exchanges the workflow's federated token for short-lived STS credentials in one second — no static AWS keys exist anywhere in the repository or its secrets. |
+| `15b-prod-approval-waiting.png` | The same workflow holding `plan (prod)` in a waiting state while everything else completed — the job cannot start (and its `environment:prod` token cannot exist) until the required reviewer acts. |
+| `15c-prod-approval-dialog.png` | The reviewer-side gate: GitHub's "Review pending deployments" approval dialog for the `prod` environment. |
+| `16-cloudtrail-oidc-assume.png` | AWS-side proof: the CloudTrail `AssumeRoleWithWebIdentity` event for `eks-platform-ci-prod`, whose `userName` is the federated sub claim itself — `repo:RamiroCuenca/eks-production-platform:environment:prod`. |
+| `16b-cloudtrail-oidc-event-json.png` | The full event record: `identityProvider: token.actions.githubusercontent.com`, the OIDC principal, the GitHubActions role session, and the one-hour session duration — the complete token-exchange audit trail as AWS recorded it. |

@@ -1,0 +1,238 @@
+# Terraform / Terragrunt validation, scoped plans, and IaC security scanning.
+#
+# Plans assume per-environment IAM roles via OIDC federation — no static AWS
+# keys exist in this repository. The dev role is assumable from pull_request
+# and main contexts; the prod role only from runs that passed the `prod`
+# GitHub Environment's protection rules, so prod plans wait for approval.
+#
+# Plans are scoped to the Terragrunt units a PR actually touches, derived
+# from the merge-base diff with native git. Changes to shared code
+# (modules/, root.hcl, global.hcl) plan every unit, since any of them may
+# consume it.
+#
+# Tools install as version- and checksum-pinned release binaries; the few
+# unavoidable actions are pinned to commit SHAs, not tags.
+name: terraform
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_VERSION: 1.15.1
+  TF_SHA256: 0921fee8c8435253ca49390a02109e906042e611a4e17f69e922261f5176c74f
+  TG_VERSION: 0.93.12
+  TG_SHA256: 3a545479d573832c02cea3bd76791ed5cadff308862bdb0d03d2ed83446d1ff7
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+  TF_INPUT: "false"
+  TF_IN_AUTOMATION: "1"
+  TG_NON_INTERACTIVE: "true"
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install terraform
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/terraform.zip" \
+            "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip"
+          echo "${TF_SHA256}  $RUNNER_TEMP/terraform.zip" | sha256sum -c -
+          unzip -o -q "$RUNNER_TEMP/terraform.zip" -d "$RUNNER_TEMP/bin"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Install terragrunt
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -sSfL -o "$RUNNER_TEMP/bin/terragrunt" \
+            "https://github.com/gruntwork-io/terragrunt/releases/download/v${TG_VERSION}/terragrunt_linux_amd64"
+          echo "${TG_SHA256}  $RUNNER_TEMP/bin/terragrunt" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/bin/terragrunt"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: terraform fmt
+        run: terraform fmt -check -diff -recursive .
+
+      - name: terraform validate (modules + bootstrap)
+        run: |
+          for dir in modules/*/ bootstrap/; do
+            echo "::group::validate ${dir}"
+            terraform -chdir="$dir" init -backend=false -input=false > /dev/null
+            terraform -chdir="$dir" validate
+            echo "::endgroup::"
+          done
+
+      - name: terragrunt hcl format + validate
+        run: |
+          terragrunt hcl format --check
+          terragrunt hcl validate
+
+  changes:
+    name: detect changed units
+    runs-on: ubuntu-latest
+    outputs:
+      dev_any: ${{ steps.detect.outputs.dev_any }}
+      dev_units: ${{ steps.detect.outputs.dev_units }}
+      prod_any: ${{ steps.detect.outputs.prod_any }}
+      prod_units: ${{ steps.detect.outputs.prod_units }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+
+      - name: Derive changed Terragrunt units from the merge-base diff
+        id: detect
+        env:
+          EVENT_BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            base="$(git merge-base "origin/$GITHUB_BASE_REF" HEAD)"
+          else
+            base="$EVENT_BEFORE"
+            case "$base" in ""|0000000000000000000000000000000000000000)
+              base="$(git rev-parse HEAD~1)";;
+            esac
+          fi
+          changed="$(git diff --name-only "$base" HEAD)"
+          printf 'Changed files:\n%s\n' "$changed"
+
+          # Shared code feeds every unit — plan everything in both envs.
+          plan_all=false
+          if echo "$changed" | grep -qE '^(modules/|root\.hcl$|global\.hcl$)'; then
+            plan_all=true
+          fi
+
+          for tree in dev prod; do
+            units="$(echo "$changed" | awk -F/ -v t="$tree" '$1==t && NF>=4 {print $1"/"$2"/"$3}' | sort -u)"
+            # Files above unit depth (account.hcl, region.hcl) affect the
+            # whole tree, like shared code does.
+            if [ "$plan_all" = true ] || echo "$changed" | awk -F/ -v t="$tree" '$1==t && NF<4 {found=1} END {exit !found}'; then
+              units="$(find "$tree" -mindepth 3 -maxdepth 3 -name terragrunt.hcl -not -path '*/.terragrunt-cache/*' | sed 's|/terragrunt.hcl||' | sort)"
+            fi
+            any=false
+            [ -n "$units" ] && any=true
+            units_oneline="$(echo "$units" | xargs)"
+            echo "${tree}_any=${any}" >> "$GITHUB_OUTPUT"
+            echo "${tree}_units=${units_oneline}" >> "$GITHUB_OUTPUT"
+            echo "${tree}: any=${any} units=[${units_oneline}]"
+          done
+
+  plan-dev:
+    name: plan (dev)
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.dev_any == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install terraform
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/terraform.zip" \
+            "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip"
+          echo "${TF_SHA256}  $RUNNER_TEMP/terraform.zip" | sha256sum -c -
+          unzip -o -q "$RUNNER_TEMP/terraform.zip" -d "$RUNNER_TEMP/bin"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Install terragrunt
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -sSfL -o "$RUNNER_TEMP/bin/terragrunt" \
+            "https://github.com/gruntwork-io/terragrunt/releases/download/v${TG_VERSION}/terragrunt_linux_amd64"
+          echo "${TG_SHA256}  $RUNNER_TEMP/bin/terragrunt" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/bin/terragrunt"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Assume ci-dev via OIDC
+        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6.2.0
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/eks-platform-ci-dev
+          aws-region: ap-northeast-1
+
+      - name: Terragrunt plan (changed dev units)
+        run: |
+          args=()
+          for unit in ${{ needs.changes.outputs.dev_units }}; do
+            args+=(--queue-include-dir "$unit")
+          done
+          terragrunt run --all --queue-strict-include "${args[@]}" -- plan -lock-timeout=5m
+
+  plan-prod:
+    name: plan (prod)
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.prod_any == 'true'
+    runs-on: ubuntu-latest
+    # The prod role's OIDC trust only accepts tokens stamped with
+    # environment:prod, which GitHub issues solely to runs that passed this
+    # Environment's protection rules — the approval gate is enforced by the
+    # token issuer, not by this file.
+    environment: prod
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install terraform
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/terraform.zip" \
+            "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip"
+          echo "${TF_SHA256}  $RUNNER_TEMP/terraform.zip" | sha256sum -c -
+          unzip -o -q "$RUNNER_TEMP/terraform.zip" -d "$RUNNER_TEMP/bin"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Install terragrunt
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -sSfL -o "$RUNNER_TEMP/bin/terragrunt" \
+            "https://github.com/gruntwork-io/terragrunt/releases/download/v${TG_VERSION}/terragrunt_linux_amd64"
+          echo "${TG_SHA256}  $RUNNER_TEMP/bin/terragrunt" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/bin/terragrunt"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Assume ci-prod via OIDC
+        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6.2.0
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/eks-platform-ci-prod
+          aws-region: ap-northeast-1
+
+      - name: Terragrunt plan (changed prod units)
+        run: |
+          args=()
+          for unit in ${{ needs.changes.outputs.prod_units }}; do
+            args+=(--queue-include-dir "$unit")
+          done
+          terragrunt run --all --queue-strict-include "${args[@]}" -- plan -lock-timeout=5m
+
+  trivy:
+    name: trivy config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install trivy
+        env:
+          TRIVY_VERSION: 0.71.0
+          TRIVY_SHA256: 30a3d22b23f88c233f1658f562fb477cae3b3e8b4761109d515b7698daf85814
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/trivy.tar.gz" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  $RUNNER_TEMP/trivy.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/bin"
+          tar -xzf "$RUNNER_TEMP/trivy.tar.gz" -C "$RUNNER_TEMP/bin" trivy
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Scan IaC configuration
+        run: trivy config .   # severity/exit-code/skip-dirs come from trivy.yaml
