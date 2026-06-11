@@ -35,12 +35,20 @@ shots as each pipeline ships.
 |---|---|
 | `08-semgrep-fail.png` | The gate failing its very first CI run on a real finding, not a staged one: `p/terraform` flagged `map_public_ip_on_launch = true` on the public subnets — a default-open setting the Trivy gate had not caught, concrete evidence for running overlapping scanners with different rule coverage. |
 | `08b-semgrep-pass.png` | The same job green after the fix landed — the attribute was removed rather than suppressed, since nothing launched in public subnets needs an auto-assigned address (NAT gateways use EIPs, load balancers attach their own). 108 rules across Terraform, workflow, and Dockerfile packs, 0 findings. |
+| `08c-semgrep-k8s-fail.png` | The Kubernetes-specific rule pack on the gitops repository rejecting a privileged debug pod — four blocking findings from one manifest (privileged container, privilege escalation, writable root filesystem), each with the rule's rationale and suggested fix inline in the log. |
 
 ## Dependency hygiene (Dependabot)
 
 | File | What it proves |
 |---|---|
 | `19-dependabot-settings.png` | Advanced Security settings with the full Dependabot stack enabled — dependency graph, vulnerability alerts, and automated security updates — alongside the committed version-update config that keeps the SHA-pinned workflow actions current. Captured on the gitops repo; both repositories carry the same configuration. |
+
+## Manifest validation gates (kubeconform + helm)
+
+| File | What it proves |
+|---|---|
+| `09-kubeconform-fail.png` | The kubeconform gate rejecting an ApplicationSet with an unknown apiVersion during a fail-closed verification: "could not find schema" is a hard error, not a skip, so a resource the validator doesn't recognize can never reach ArgoCD unvalidated. |
+| `10-helm-lint-fail.png` | The helm gate failing the same run on a deliberate template parse error. The step header documents the subtle part: without `pipefail`, a failed `helm template` hands kubeconform an empty stream that validates vacuously green — the gate is wired to fail on render errors, not just invalid output. |
 
 ## Terraform pipeline + OIDC federation in action
 
@@ -52,3 +60,23 @@ shots as each pipeline ships.
 | `15c-prod-approval-dialog.png` | The reviewer-side gate: GitHub's "Review pending deployments" approval dialog for the `prod` environment. |
 | `16-cloudtrail-oidc-assume.png` | AWS-side proof: the CloudTrail `AssumeRoleWithWebIdentity` event for `eks-platform-ci-prod`, whose `userName` is the federated sub claim itself — `repo:RamiroCuenca/eks-production-platform:environment:prod`. |
 | `16b-cloudtrail-oidc-event-json.png` | The full event record: `identityProvider: token.actions.githubusercontent.com`, the OIDC principal, the GitHubActions role session, and the one-hour session duration — the complete token-exchange audit trail as AWS recorded it. |
+
+## Deliberate-failure verification — every gate red, then green, on one PR
+
+A single commit planted one violation per gate — a shape-valid fake credential, a workflow script-injection pattern, an unencrypted bucket, an undeclared variable reference — and the same pull request was then brought back to green. The PR is preserved unmerged so the run history stays clickable. (A paired-credential variant never reached CI at all: GitHub push protection rejected it server-side, one layer ahead of these gates.)
+
+| File | What it proves |
+|---|---|
+| `11-proof-pr-all-red.png` | The merge box with all four gates failing simultaneously on one commit — secrets, SAST, IaC misconfiguration, and configuration validity — each tagged **Required**, so no path to merge exists while any gate is red. Plan jobs correctly skipped: the planted files touched no deployable infrastructure paths. |
+| `12-proof-pr-finding-detail.png` | Inside the failing secrets gate: rule `aws-access-token`, the secret `REDACTED` in the output, entropy score, and the exact file/line/commit fingerprint — the log pinpoints the leak without ever re-printing it. |
+| `06-terraform-validate-fail.png` | The validate gate rejecting a reference to an undeclared variable — configuration errors stop at the PR, before any plan or apply could encounter them. |
+| `07-trivy-config-fail.png` | The IaC gate red on a deliberately unencrypted bucket, proving the suppression model: the existing carve-out for the state bucket is scoped to that one resource, so a new unencrypted bucket anywhere else still fails the build. |
+| `13-proof-pr-all-green.png` | The same PR fully green — with the force-push visible in the timeline, because that *is* the remediation: a revert would have left the credential live in git history and the full-history secrets gate red by design. |
+
+## Enforcement wiring
+
+| File | What it proves |
+|---|---|
+| `17-branch-protection-infra.png` | The infra repo's ruleset on `main`: all seven checks required — secrets, validation, changed-unit detection, both environment plans, IaC scanning, SAST — plus force-push blocking. A gate that isn't required is advisory; these are not. |
+| `18-branch-protection-gitops.png` | The gitops repo's ruleset: pull request required, force-pushes blocked, and all four checks (secrets, SAST, kubeconform, helm) required before anything reaches the branch ArgoCD reconciles from. |
+| `14-readme-badges.png` | The public repo front page with every workflow badge green on `main` — the steady state all of the above enforces. |
