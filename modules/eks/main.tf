@@ -81,6 +81,15 @@ resource "aws_eks_cluster" "this" {
   role_arn = aws_iam_role.cluster.arn
   version  = var.cluster_version
 
+  # Cilium is the sole CNI (full replacement of VPC CNI + kube-proxy — see
+  # modules/cilium and the journal "CNI datapath" decision). Disabling
+  # self-managed addon bootstrap means EKS installs NO default vpc-cni,
+  # kube-proxy, or coredns at creation, so Cilium owns the datapath from the
+  # first node with no default `aws-node` DaemonSet to race against or delete.
+  # CoreDNS is installed as a managed addon afterwards by modules/cilium,
+  # once a CNI exists for its pods to schedule on.
+  bootstrap_self_managed_addons = false
+
   # Access entries only. Default cluster-creator-admin is off so that operator
   # access is granted through an explicit, auditable access_entry resource,
   # not an invisible implicit grant to whoever first ran apply.

@@ -29,6 +29,19 @@ dependency "eks" {
   mock_outputs_allowed_terraform_commands = ["validate", "init", "plan"]
 }
 
+# Ordering-only dependency: ArgoCD's pods cannot run until a CNI exists, so
+# this unit must apply after Cilium is healthy. No outputs are consumed — the
+# dependency block alone places the edge in Terragrunt's run-all DAG.
+dependency "cilium" {
+  config_path = "../cilium"
+
+  mock_outputs = {
+    cilium_ready             = "cilium:mock-coredns"
+    cilium_operator_role_arn = "arn:aws:iam::000000000000:role/mock-cilium-operator"
+  }
+  mock_outputs_allowed_terraform_commands = ["validate", "init", "plan"]
+}
+
 inputs = {
   cluster_name                       = dependency.eks.outputs.cluster_name
   cluster_endpoint                   = dependency.eks.outputs.cluster_endpoint
