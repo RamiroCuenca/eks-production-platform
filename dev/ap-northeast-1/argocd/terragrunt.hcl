@@ -29,17 +29,14 @@ dependency "eks" {
   mock_outputs_allowed_terraform_commands = ["validate", "init", "plan"]
 }
 
-# Ordering-only dependency: ArgoCD's pods cannot run until a CNI exists, so
-# this unit must apply after Cilium is healthy. No outputs are consumed — the
-# dependency block alone places the edge in Terragrunt's run-all DAG.
-dependency "cilium" {
-  config_path = "../cilium"
-
-  mock_outputs = {
-    cilium_ready             = "cilium:mock-coredns"
-    cilium_operator_role_arn = "arn:aws:iam::000000000000:role/mock-cilium-operator"
-  }
-  mock_outputs_allowed_terraform_commands = ["validate", "init", "plan"]
+# Ordering-only edge: ArgoCD's pods cannot run until a CNI exists, so this unit
+# must apply after Cilium (and destroy before it). A `dependencies` block places
+# the edge in Terragrunt's run-all DAG WITHOUT reading outputs — a `dependency`
+# block would try to resolve Cilium's outputs on every command and fail on
+# destroy/plan whenever the cilium unit hasn't been applied yet (it can't mock
+# for destroy, which is the safe default for real applies/destroys).
+dependencies {
+  paths = ["../cilium"]
 }
 
 inputs = {
