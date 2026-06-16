@@ -24,7 +24,12 @@ dependency "eks" {
     oidc_provider_arn                  = "arn:aws:iam::000000000000:oidc-provider/oidc.eks.ap-northeast-2.amazonaws.com/id/MOCK"
     oidc_provider_url                  = "https://oidc.eks.ap-northeast-2.amazonaws.com/id/MOCK"
   }
-  mock_outputs_allowed_terraform_commands = ["validate", "init", "plan"]
+  # Includes "destroy" so a whole-repo `run -a destroy` doesn't choke parsing
+  # this unit in regions where eks was never applied (no outputs to read). The
+  # cilium unit has no state there, so the destroy is a harmless no-op and the
+  # mock values are never used. "apply" is deliberately excluded — applying with
+  # mocked dependency values would be dangerous.
+  mock_outputs_allowed_terraform_commands = ["validate", "init", "plan", "destroy"]
 }
 
 inputs = {

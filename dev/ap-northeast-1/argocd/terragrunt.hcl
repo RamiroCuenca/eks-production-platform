@@ -26,7 +26,7 @@ dependency "eks" {
     karpenter_node_role_name           = "mock-karpenter-node"
     karpenter_interruption_queue_name  = "mock-karpenter-interruption"
   }
-  mock_outputs_allowed_terraform_commands = ["validate", "init", "plan"]
+  mock_outputs_allowed_terraform_commands = ["validate", "init", "plan", "destroy"]
 }
 
 # Ordering-only edge: ArgoCD's pods cannot run until a CNI exists, so this unit
