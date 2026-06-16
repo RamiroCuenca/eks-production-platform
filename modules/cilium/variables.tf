@@ -45,7 +45,7 @@ variable "oidc_provider_url" {
 variable "cilium_version" {
   description = "Cilium Helm chart version. Pin explicitly and VERIFY against the cluster's Kubernetes version in the Cilium support matrix before applying — a chart that predates the k8s minor can fail subtly at runtime. Bumped via PR like every other pinned dependency."
   type        = string
-  default     = "1.17.4"
+  default     = "1.19.4"
 }
 
 variable "cilium_operator_replicas" {
