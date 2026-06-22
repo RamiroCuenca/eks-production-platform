@@ -92,6 +92,32 @@ variable "system_node_disk_size" {
   default     = 50
 }
 
+# ---------- Cilium CNI ----------
+
+variable "cilium_version" {
+  description = "Cilium Helm chart version. Pin explicitly and VERIFY against the cluster's Kubernetes version in the Cilium support matrix before applying — a chart that predates the k8s minor can fail subtly at runtime. Bumped via PR like every other pinned dependency."
+  type        = string
+  default     = "1.19.4"
+}
+
+variable "cilium_operator_replicas" {
+  description = "Replica count for the Cilium operator. One is sufficient for dev; prod can raise to 2 for HA (the operator is the only component that allocates ENIs, so a brief gap during a node loss is tolerable but HA is cleaner in prod)."
+  type        = number
+  default     = 1
+}
+
+variable "hubble_ui_enabled" {
+  description = "Enable the Hubble UI. On for the portfolio (the flow graph is a key observability screenshot); exposed via port-forward only, never a public LoadBalancer."
+  type        = bool
+  default     = true
+}
+
+variable "coredns_addon_version" {
+  description = "Optional pinned version for the CoreDNS managed addon. Empty string lets EKS pick the default-compatible version for the cluster's Kubernetes version, which is the right default for a build-screenshot-destroy lifecycle."
+  type        = string
+  default     = ""
+}
+
 # ---------- Karpenter AWS scaffolding ----------
 
 variable "karpenter_namespace" {
