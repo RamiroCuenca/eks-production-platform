@@ -12,12 +12,15 @@
 # Authentication uses `exec` (aws eks get-token) rather than a static
 # aws_eks_cluster_auth token: with wait=false the connection is short-lived, but
 # exec re-mints a token per call and matches the argocd module's pattern.
+# helm provider v3 uses attribute syntax for `kubernetes` and `exec`
+# (`kubernetes = { ... }`, `exec = { ... }`) — the nested-block form was a v2
+# construct removed in v3.
 provider "helm" {
-  kubernetes {
+  kubernetes = {
     host                   = aws_eks_cluster.this.endpoint
     cluster_ca_certificate = base64decode(aws_eks_cluster.this.certificate_authority[0].data)
 
-    exec {
+    exec = {
       api_version = "client.authentication.k8s.io/v1"
       command     = "aws"
       args        = ["eks", "get-token", "--cluster-name", aws_eks_cluster.this.name, "--region", var.aws_region]

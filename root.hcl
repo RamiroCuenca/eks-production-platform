@@ -72,19 +72,20 @@ generate "versions" {
       required_providers {
         aws = {
           source  = "hashicorp/aws"
-          version = "~> 6.43"
+          version = "~> 6.51"
         }
         tls = {
           source  = "hashicorp/tls"
-          version = "~> 4.1"
+          version = "~> 4.3"
         }
         # Cluster-touching providers. Declared centrally so every module gets
         # consistent version pinning; only configured (and only authenticated
         # against the cluster) inside modules that actually use them — today,
-        # only modules/argocd/. Declaration alone causes no cluster connection.
+        # modules/eks/ (Cilium CNI) and modules/argocd/. Declaration alone
+        # causes no cluster connection.
         helm = {
           source  = "hashicorp/helm"
-          version = "~> 2.17"
+          version = "~> 3.2"
         }
         kubernetes = {
           source  = "hashicorp/kubernetes"
