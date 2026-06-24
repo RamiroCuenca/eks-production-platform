@@ -4,24 +4,6 @@ include "root" {
 
 terraform {
   source = "${get_repo_root()}/modules/argocd"
-
-  # ArgoCD installs a ValidatingWebhookConfiguration with failurePolicy: Fail.
-  # Once argocd-server is torn down by the Helm release destroy, any resource
-  # delete that hits the webhook endpoint is blocked — the namespace hangs
-  # indefinitely. Application, AppProject, and ApplicationSet CRs also carry
-  # resources-finalizer.argocd.argoproj.io which the (now-gone) controller can
-  # no longer process. Strip all three finalizer types and delete the webhook
-  # configs first so the namespace delete completes in seconds.
-  before_hook "strip_argocd_finalizers" {
-    commands = ["destroy"]
-    execute = ["bash", "-c", <<-EOT
-      kubectl patch applications.argoproj.io -n argocd --all --type=merge -p '{"metadata":{"finalizers":[]}}' 2>/dev/null || true
-      kubectl patch appprojects.argoproj.io -n argocd --all --type=merge -p '{"metadata":{"finalizers":[]}}' 2>/dev/null || true
-      kubectl patch applicationsets.argoproj.io -n argocd --all --type=merge -p '{"metadata":{"finalizers":[]}}' 2>/dev/null || true
-      kubectl delete validatingwebhookconfigurations,mutatingwebhookconfigurations -l app.kubernetes.io/name=argocd 2>/dev/null || true
-    EOT
-    ]
-  }
 }
 
 # EKS provides every per-cluster fact the ArgoCD cluster Secret needs to

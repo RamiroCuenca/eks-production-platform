@@ -60,6 +60,16 @@ resource "kubernetes_namespace" "argocd" {
       "app.kubernetes.io/managed-by" = "terraform"
     }
   }
+
+  # Never attempt to delete this namespace via the Kubernetes API. ArgoCD CRDs
+  # carry finalizers and a ValidatingWebhookConfiguration (failurePolicy: Fail)
+  # that block namespace deletion once argocd-server is down — the namespace
+  # hangs indefinitely. The EKS cluster destroy wipes the namespace along with
+  # everything else, so Terraform deleting it separately is both redundant and
+  # the source of the hang.
+  lifecycle {
+    skip_destroy = true
+  }
 }
 
 # ---------- Helm install ----------
