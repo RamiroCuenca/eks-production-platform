@@ -4,16 +4,6 @@ include "root" {
 
 terraform {
   source = "${get_repo_root()}/modules/argocd"
-
-  # ArgoCD Application resources carry resources-finalizer.argocd.argoproj.io,
-  # which tells the controller to deprovision managed k8s resources before the
-  # app is removed. During a destroy the controller is being torn down at the
-  # same time, so it can never process those finalizers — the namespace hangs
-  # indefinitely. Strip them first so the namespace delete completes instantly.
-  before_hook "strip_argocd_finalizers" {
-    commands = ["destroy"]
-    execute  = ["bash", "-c", "kubectl patch applications.argoproj.io -n argocd --all --type=merge -p '{\"metadata\":{\"finalizers\":[]}}' 2>/dev/null || true"]
-  }
 }
 
 # EKS provides every per-cluster fact the ArgoCD cluster Secret needs to
