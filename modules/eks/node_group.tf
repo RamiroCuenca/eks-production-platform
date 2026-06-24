@@ -48,8 +48,15 @@ resource "aws_eks_node_group" "system" {
   # when the node group is created — no manual access entry needed for the
   # system tier. (Karpenter-launched nodes do need an explicit entry; see
   # access_entries.tf.)
+  #
+  # depends_on helm_release.cilium is the linchpin of the whole bootstrap: the
+  # CNI must exist BEFORE these nodes join, or they sit NotReady forever and the
+  # managed node group never reaches ACTIVE (the deadlock every earlier design
+  # hit). With Cilium installed first, each joining node is networked within
+  # ~1-3 min and the group converges normally.
   depends_on = [
     aws_iam_role_policy_attachment.system_node,
+    helm_release.cilium,
   ]
 
   lifecycle {

@@ -81,6 +81,25 @@ resource "aws_eks_cluster" "this" {
   role_arn = aws_iam_role.cluster.arn
   version  = var.cluster_version
 
+  # Install NO default networking addons at cluster creation — no vpc-cni, no
+  # kube-proxy, no coredns. Cilium is the sole CNI, installed by a helm_release
+  # in THIS module (cilium.tf) in the window BETWEEN the control plane and the
+  # managed node group, so the cluster never carries the VPC CNI: there is
+  # nothing to delete later and no leftover ENI/iptables state to contaminate
+  # Cilium's datapath.
+  #
+  # Ordering inside this module is the whole design:
+  #   aws_eks_cluster.this
+  #     -> helm_release.cilium        (cilium.tf, wait=false)
+  #     -> aws_eks_node_group.system  (node_group.tf, depends_on the release)
+  #     -> aws_eks_addon.coredns      (addons.tf, depends_on the node group)
+  # Because the CNI is present before any node joins, the managed node group
+  # converges to ACTIVE the normal way (it gates on node Ready, which now has a
+  # CNI to satisfy it). Its reaching ACTIVE is the built-in proof that Cilium
+  # networked the nodes. See the journal "Cluster bootstrap" decision — earlier
+  # designs that installed Cilium in a downstream unit deadlocked here.
+  bootstrap_self_managed_addons = false
+
   # Access entries only. Default cluster-creator-admin is off so that operator
   # access is granted through an explicit, auditable access_entry resource,
   # not an invisible implicit grant to whoever first ran apply.

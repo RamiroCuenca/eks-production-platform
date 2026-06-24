@@ -48,28 +48,22 @@ locals {
   }
 }
 
-# ---------- Namespace ----------
-#
-# Created explicitly rather than via Helm's create_namespace so we can apply
-# labels and so the Secret resource has a guaranteed parent during apply.
-
-resource "kubernetes_namespace" "argocd" {
-  metadata {
-    name = var.argocd_namespace
-    labels = {
-      "app.kubernetes.io/managed-by" = "terraform"
-    }
-  }
-}
-
 # ---------- Helm install ----------
+#
+# The namespace is intentionally NOT managed as a separate kubernetes_namespace
+# resource. ArgoCD installs a ValidatingWebhookConfiguration (failurePolicy:
+# Fail) that blocks any resource delete once argocd-server is down, causing the
+# namespace to hang indefinitely in Terminating state. Helm uninstall never
+# deletes the namespace by default, so the EKS cluster destroy cleans it up
+# with no intervention. create_namespace = true covers the install side.
 
 resource "helm_release" "argocd" {
-  name       = "argocd"
-  repository = "https://argoproj.github.io/argo-helm"
-  chart      = "argo-cd"
-  version    = var.argocd_chart_version
-  namespace  = kubernetes_namespace.argocd.metadata[0].name
+  name             = "argocd"
+  repository       = "https://argoproj.github.io/argo-helm"
+  chart            = "argo-cd"
+  version          = var.argocd_chart_version
+  namespace        = var.argocd_namespace
+  create_namespace = true
 
   # Wait for the rollout to complete before downstream resources (root
   # Application, cluster Secret consumers) try to talk to the ApplicationSet
@@ -203,7 +197,7 @@ locals {
 resource "kubernetes_secret" "cluster" {
   metadata {
     name        = var.cluster_name
-    namespace   = kubernetes_namespace.argocd.metadata[0].name
+    namespace   = var.argocd_namespace
     labels      = local.cluster_secret_labels
     annotations = local.cluster_secret_annotations
   }
@@ -252,7 +246,7 @@ resource "kubectl_manifest" "root_application" {
     kind       = "Application"
     metadata = {
       name      = "root"
-      namespace = kubernetes_namespace.argocd.metadata[0].name
+      namespace = var.argocd_namespace
       # Empty finalizers list on the App-of-Apps root so a `kubectl delete
       # application root` doesn't cascade-prune every child; children own
       # their own resources' lifecycle through their own finalizers.
@@ -270,7 +264,7 @@ resource "kubectl_manifest" "root_application" {
       }
       destination = {
         server    = "https://kubernetes.default.svc"
-        namespace = kubernetes_namespace.argocd.metadata[0].name
+        namespace = var.argocd_namespace
       }
       syncPolicy = {
         automated = {

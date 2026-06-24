@@ -30,12 +30,15 @@ provider "kubernetes" {
   }
 }
 
+# helm provider v3 takes `kubernetes` and `exec` as attributes (`= { ... }`),
+# not nested blocks — the v2 block form was removed in v3. (The kubernetes and
+# kubectl providers below are unaffected and keep their block syntax.)
 provider "helm" {
-  kubernetes {
+  kubernetes = {
     host                   = var.cluster_endpoint
     cluster_ca_certificate = base64decode(var.cluster_certificate_authority_data)
 
-    exec {
+    exec = {
       api_version = "client.authentication.k8s.io/v1"
       command     = "aws"
       args        = ["eks", "get-token", "--cluster-name", var.cluster_name, "--region", var.aws_region]
