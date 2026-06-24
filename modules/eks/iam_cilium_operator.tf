@@ -58,6 +58,7 @@ resource "aws_iam_role_policy" "cilium_operator" {
         Effect = "Allow"
         Action = [
           "ec2:DescribeNetworkInterfaces",
+          "ec2:DescribeRouteTables",
           "ec2:DescribeSubnets",
           "ec2:DescribeVpcs",
           "ec2:DescribeSecurityGroups",
