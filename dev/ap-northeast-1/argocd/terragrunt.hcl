@@ -29,6 +29,20 @@ dependency "eks" {
   mock_outputs_allowed_terraform_commands = ["validate", "init", "plan"]
 }
 
+# The secrets module produces the demo-app IRSA role ARN and the env-scoped
+# secret name that the gitops demo chart needs. They cross into the public
+# gitops repo only through the ArgoCD cluster Secret this module writes — so
+# argocd fans in on both eks and secrets (edge: eks -> secrets -> argocd).
+dependency "secrets" {
+  config_path = "../secrets"
+
+  mock_outputs = {
+    demo_app_secrets_role_arn = "arn:aws:iam::000000000000:role/mock-demo-app-secrets"
+    demo_secret_name          = "eks-platform/dev/demo-app/credentials"
+  }
+  mock_outputs_allowed_terraform_commands = ["validate", "init", "plan"]
+}
+
 inputs = {
   cluster_name                       = dependency.eks.outputs.cluster_name
   cluster_endpoint                   = dependency.eks.outputs.cluster_endpoint
@@ -36,6 +50,9 @@ inputs = {
   karpenter_controller_role_arn      = dependency.eks.outputs.karpenter_controller_role_arn
   karpenter_node_role_name           = dependency.eks.outputs.karpenter_node_role_name
   karpenter_interruption_queue_name  = dependency.eks.outputs.karpenter_interruption_queue_name
+
+  demo_app_secrets_role_arn = dependency.secrets.outputs.demo_app_secrets_role_arn
+  demo_secret_name          = dependency.secrets.outputs.demo_secret_name
 
   gitops_repo_url = "https://github.com/RamiroCuenca/eks-platform-gitops.git"
 
