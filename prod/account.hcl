@@ -6,7 +6,7 @@ locals {
   # EKS Kubernetes version. Kept identical to dev at steady state. During an
   # upgrade soak window, dev bumps first and prod follows after ~1 week once
   # addon compatibility is validated.
-  cluster_version = "1.35"
+  cluster_version = "1.36"
 
   # CIDRs that may reach the EKS public API endpoint. Tightly allowlisted in
   # prod: the operator exports OPERATOR_IP_CIDR (e.g. "203.0.113.7/32") at
