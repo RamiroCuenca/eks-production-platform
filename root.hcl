@@ -78,6 +78,14 @@ generate "versions" {
           source  = "hashicorp/tls"
           version = "~> 4.3"
         }
+        # Used by modules/secrets/ to generate the demonstration credential
+        # value so no real secret ever lands in version control. Declared
+        # centrally because this generated versions.tf overwrites any
+        # module-local copy.
+        random = {
+          source  = "hashicorp/random"
+          version = "~> 3.6"
+        }
         # Cluster-touching providers. Declared centrally so every module gets
         # consistent version pinning; only configured (and only authenticated
         # against the cluster) inside modules that actually use them — today,
