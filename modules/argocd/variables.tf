@@ -45,6 +45,18 @@ variable "karpenter_interruption_queue_name" {
   type        = string
 }
 
+# ---------- Secrets wiring (from the secrets module via dependency block) ----------
+
+variable "demo_app_secrets_role_arn" {
+  description = "IRSA role ARN the gitops demo chart annotates onto the demo ServiceAccount so the ASCP provider can assume it. Account-specific, so it crosses into the public gitops repo only through this cluster Secret. Propagated via the cluster Secret."
+  type        = string
+}
+
+variable "demo_secret_name" {
+  description = "Secrets Manager secret name the gitops demo SecretProviderClass references as its objectName. Env-specific (dev/prod in the path). Propagated via the cluster Secret."
+  type        = string
+}
+
 # ---------- ArgoCD configuration ----------
 
 variable "argocd_chart_version" {

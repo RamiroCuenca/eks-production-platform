@@ -45,6 +45,8 @@ locals {
     "platform.io/karpenter-controller-role-arn" = var.karpenter_controller_role_arn
     "platform.io/karpenter-node-role-name"      = var.karpenter_node_role_name
     "platform.io/karpenter-interruption-queue"  = var.karpenter_interruption_queue_name
+    "platform.io/demo-app-secrets-role-arn"     = var.demo_app_secrets_role_arn
+    "platform.io/demo-secret-name"              = var.demo_secret_name
   }
 }
 
