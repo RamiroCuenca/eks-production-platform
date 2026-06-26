@@ -42,6 +42,10 @@ shots as each pipeline ships.
 | File | What it proves |
 |---|---|
 | `19-dependabot-settings.png` | Advanced Security settings with the full Dependabot stack enabled — dependency graph, vulnerability alerts, and automated security updates — alongside the committed version-update config that keeps the SHA-pinned workflow actions current. Captured on the gitops repo; both repositories carry the same configuration. |
+| `20-dependabot-pr-opened.png` | Dependabot opening PR #22 unprompted — a **grouped** `github_actions` version update (`actions/checkout` 6.0.3 → 7.0.0) carrying the `dependencies` and `github_actions` labels. Grouping is deliberate config: related action bumps arrive as one reviewable PR instead of a swarm of single-line ones. |
+| `20b-dependabot-pr-checks-green.png` | The same PR "Ready to merge" with the CI checks green and the bump commit GPG-`Verified` — the bot's change is held to the identical branch-protection bar (secrets, SAST, validation) as any human PR before it can land. |
+| `20c-dependabot-pr-sha-pinned-bump.png` | Files-changed view: the bump rewrites the **commit-SHA pin** of `actions/checkout` across all three workflows (`sast`, `secrets-scan`, `terraform`) and updates the trailing `# v6.0.3` → `# v7.0.0` comment — proof the SHA-pinning supply-chain posture is maintained automatically, not eroded back into floating tags. |
+| `20d-dependabot-pr-merged.png` | The PR merged into `main` after human review, closing the loop: the bot proposes, the required gates verify, a human approves. Automated dependency currency without unattended merges. |
 
 ## Manifest validation gates (kubeconform + helm)
 
