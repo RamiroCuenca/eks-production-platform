@@ -18,6 +18,19 @@ locals {
     get_env("OPERATOR_IP_CIDR", "127.0.0.1/32"),
   ]
 
+  # ---- Data tier (Aurora + ElastiCache) sizing ----
+  # prod scales the instances up and hardens lifecycle: deletion protection on,
+  # a final snapshot taken on destroy, and longer backup/snapshot retention.
+  aurora_instance_class      = "db.r6g.large"
+  aurora_instance_count      = 3
+  aurora_backup_retention    = 14
+  aurora_deletion_protection = true
+  aurora_skip_final_snapshot = false
+
+  redis_node_type          = "cache.r6g.large"
+  redis_num_cache_clusters = 3
+  redis_snapshot_retention = 7
+
   common_tags = {
     Environment = "prod"
   }
