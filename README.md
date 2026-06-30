@@ -102,6 +102,17 @@ flowchart LR
 
 *Dotted edges (ECR image push, GitOps tag commit-back) are the next layer of the application pipeline, see [Roadmap](#roadmap). A higher-fidelity diagram (`docs/architecture.png`) may replace these Mermaid renders in a later pass; the Mermaid versions are version-controlled and need no external tooling.*
 
+### Highlights
+
+A few shots from the running platform; the full, captioned set is indexed under [Deployment evidence](#deployment-evidence).
+
+| | |
+|:---:|:---:|
+| [<img src="docs/screenshots/argocd/03-applications-tree.png" alt="ArgoCD application tree, synced and healthy">](docs/screenshots/argocd/) | [<img src="docs/screenshots/cilium/05-hubble-ui.png" alt="Hubble live network-flow graph">](docs/screenshots/cilium/) |
+| **GitOps:** ArgoCD App-of-Apps tree, synced and healthy | **eBPF networking:** Hubble live flow graph |
+| [<img src="docs/screenshots/argocd/10b-ec2-mixed-fleet.png" alt="Karpenter-provisioned spot fleet in the EC2 console">](docs/screenshots/argocd/) | [<img src="docs/screenshots/ci/04-gitleaks-fail.png" alt="Secret-scanning gate failing a pull request on a planted credential">](docs/screenshots/ci/) |
+| **Autoscaling:** Karpenter-provisioned spot fleet | **DevSecOps:** secret-scanning gate blocking a planted credential |
+
 ---
 
 ## Three-repository topology
