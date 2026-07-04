@@ -55,3 +55,45 @@ variable "demo_service_account" {
   type        = string
   default     = "demo-app"
 }
+
+# ---------- Go demo workload identity (must match the gitops go-demo chart) ----------
+
+variable "go_demo_service_account" {
+  description = "ServiceAccount the Go demo app (server + worker Deployments) runs as. The runtime IRSA role's trust policy pins to it. Lives in demo_namespace alongside the Phase 5 demo workload."
+  type        = string
+  default     = "go-demo"
+}
+
+variable "go_demo_db_init_service_account" {
+  description = "ServiceAccount the one-shot database-init Job runs as. The only identity allowed to read the RDS-managed master secret — deliberately distinct from the runtime SA."
+  type        = string
+  default     = "go-demo-db-init"
+}
+
+variable "go_demo_db_username" {
+  description = "Name of the least-privilege database user the init Job creates and the app authenticates as. Written into the generated credential secret and propagated to the gitops chart via the ArgoCD cluster Secret so the two never drift."
+  type        = string
+  default     = "app_user"
+}
+
+# ---------- Data-tier wiring (from the aurora/elasticache modules via Terragrunt dependencies) ----------
+
+variable "aurora_master_secret_arn" {
+  description = "ARN of the RDS-managed master credential secret. Granted to the db-init role ONLY — the runtime role must never be able to read it."
+  type        = string
+}
+
+variable "aurora_kms_key_arn" {
+  description = "ARN of the Aurora module's CMK, which encrypts the master secret. The db-init role's kms:Decrypt is scoped to it, ViaService-gated."
+  type        = string
+}
+
+variable "redis_connection_secret_arn" {
+  description = "ARN of the Redis connection secret (endpoints + AUTH token). The runtime role reads it to authenticate to ElastiCache."
+  type        = string
+}
+
+variable "redis_kms_key_arn" {
+  description = "ARN of the ElastiCache module's CMK, which encrypts the Redis connection secret. The runtime role's kms:Decrypt is scoped to it, ViaService-gated."
+  type        = string
+}
