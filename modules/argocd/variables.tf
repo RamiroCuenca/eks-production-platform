@@ -57,6 +57,70 @@ variable "demo_secret_name" {
   type        = string
 }
 
+variable "go_demo_secrets_role_arn" {
+  description = "Runtime IRSA role ARN for the Go demo app's ServiceAccount. Account-specific. Propagated via the cluster Secret."
+  type        = string
+}
+
+variable "go_demo_db_init_role_arn" {
+  description = "IRSA role ARN for the database-init Job's ServiceAccount — the only identity that may read the RDS master secret. Propagated via the cluster Secret."
+  type        = string
+}
+
+variable "go_demo_db_secret_name" {
+  description = "Name of the generated app-user DB credential secret, referenced as a SecretProviderClass objectName by the go-demo chart. Propagated via the cluster Secret."
+  type        = string
+}
+
+variable "go_demo_db_username" {
+  description = "Least-privilege DB username the app authenticates as. Bridged so the chart's DB_USER env shares one source with the credential secret's contents."
+  type        = string
+}
+
+# ---------- Data-tier wiring (from the aurora/elasticache modules via dependency blocks) ----------
+
+variable "aurora_master_secret_arn" {
+  description = "ARN of the RDS-managed master secret. Bridged as an ARN (not a name) because RDS generates the name; ASCP accepts full ARNs as objectName. Consumed only by the db-init Job's SecretProviderClass."
+  type        = string
+}
+
+variable "aurora_writer_endpoint" {
+  description = "Aurora writer endpoint hostname. Apply-generated, non-secret — becomes the app's DB_HOST env via the cluster Secret rather than a hardcoded value that would drift."
+  type        = string
+}
+
+variable "aurora_port" {
+  description = "PostgreSQL port. Bridged as a string (annotation values must be strings)."
+  type        = string
+}
+
+variable "aurora_database_name" {
+  description = "Initial database name the app connects to (DB_NAME env)."
+  type        = string
+}
+
+variable "redis_primary_endpoint" {
+  description = "ElastiCache primary endpoint hostname. Becomes the host part of the app's REDIS_ADDR env."
+  type        = string
+}
+
+variable "redis_port" {
+  description = "Redis port. Bridged as a string (annotation values must be strings)."
+  type        = string
+}
+
+variable "redis_connection_secret_name" {
+  description = "Name of the Redis connection secret whose auth_token key the go-demo SecretProviderClass extracts (jmesPath) into the mounted REDIS_PASSWORD file."
+  type        = string
+}
+
+# ---------- Registry wiring (from the ecr module via dependency block) ----------
+
+variable "ecr_repository_url" {
+  description = "Full ECR repository URL for the demo-app image. Embeds the account ID, so it crosses into the public gitops repo only through the cluster Secret; CI promotes only the tag."
+  type        = string
+}
+
 # ---------- ArgoCD configuration ----------
 
 variable "argocd_chart_version" {

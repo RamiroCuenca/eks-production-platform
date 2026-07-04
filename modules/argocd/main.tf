@@ -47,6 +47,25 @@ locals {
     "platform.io/karpenter-interruption-queue"  = var.karpenter_interruption_queue_name
     "platform.io/demo-app-secrets-role-arn"     = var.demo_app_secrets_role_arn
     "platform.io/demo-secret-name"              = var.demo_secret_name
+
+    # Go demo app. The split is by secrecy of the value: non-secret,
+    # Terraform-owned facts (endpoints, ports, the registry URL, role ARNs)
+    # travel here and become plain pod env / image fields in the chart, while
+    # secret material (DB password, Redis AUTH token) is delivered only as
+    # CSI-mounted tmpfs files. The master secret is referenced by ARN because
+    # RDS names it (`rds!cluster-…`) — ASCP accepts full ARNs as objectName.
+    "platform.io/go-demo-secrets-role-arn"     = var.go_demo_secrets_role_arn
+    "platform.io/go-demo-db-init-role-arn"     = var.go_demo_db_init_role_arn
+    "platform.io/go-demo-db-secret-name"       = var.go_demo_db_secret_name
+    "platform.io/go-demo-db-user"              = var.go_demo_db_username
+    "platform.io/go-demo-image-repository"     = var.ecr_repository_url
+    "platform.io/aurora-master-secret-arn"     = var.aurora_master_secret_arn
+    "platform.io/aurora-writer-endpoint"       = var.aurora_writer_endpoint
+    "platform.io/aurora-port"                  = var.aurora_port
+    "platform.io/aurora-database"              = var.aurora_database_name
+    "platform.io/redis-primary-endpoint"       = var.redis_primary_endpoint
+    "platform.io/redis-port"                   = var.redis_port
+    "platform.io/redis-connection-secret-name" = var.redis_connection_secret_name
   }
 }
 
