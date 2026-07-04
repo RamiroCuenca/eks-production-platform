@@ -24,6 +24,11 @@ locals {
   github_org  = "RamiroCuenca"
   github_repo = "eks-production-platform"
 
+  # Application source repository. Its main-branch workflow assumes the ECR
+  # push role (modules/ecr); kept here with the other GitHub identity facts so
+  # trust policies never hardcode repo names.
+  github_app_repo = "eks-platform-demo-app"
+
   common_tags = {
     Project    = "eks-platform"
     Owner      = "RamiroCuenca"
