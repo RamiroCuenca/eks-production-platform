@@ -27,3 +27,10 @@ The application repository's pipeline publishes a multi-arch container image to 
 | `08-pr-publish-skipped.png` | The same workflow on a pull request: `publish image` is **skipped** while the build/scan gates still run — the PR-holds-no-identity design visible in the UI. |
 | `09-cloudtrail-assume-role-list.png` | CloudTrail's `AssumeRoleWithWebIdentity` events with each caller's OIDC **sub claim as the user name**: the app repo's `ref:refs/heads/main` publishes alongside the infra repo's `environment:prod` plan — the whole CI identity model in one view, every assumption attributable to a repo and context. |
 | `09b-cloudtrail-assume-role-detail.png` | One publish event's full record: `userName` and `subjectFromWebIdentityToken` carry the main-ref sub claim, the assumed role is `eks-platform-ci-app`, and the credentials are a short-lived session — the AWS-side half of the exchange shown in `07b`. |
+
+## The delivery loop, closed
+
+| File | What it proves |
+|---|---|
+| `10-promotion-pr-automerged.png` | The first automated promotion: the pipeline-opened PR in the gitops repository — a one-line diff moving the pinned image tag to the artifact just published — with auto-merge enabled, all four of that repository's validation gates passed, and the merge landing with no human touch. Every deployment is an auditable Git event that cleared the same checks as a human change; no actor bypasses branch protection. |
+| `10b-ci-run-full-chain.png` | The complete delivery chain in one run: build/test and the container scan gate the publish, and the promotion runs only after the image exists in the registry. Merge → gates → multi-arch publish → auto-merged promotion → ArgoCD reconciles. |
