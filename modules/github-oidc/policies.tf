@@ -3,10 +3,11 @@
 # apply_enabled = true  (dev: plan-on-PR + apply-on-merge) — a service-level
 # allowlist of what the stack actually provisions, deliberately not
 # AdministratorAccess: the boundary caps the catastrophic categories, and the
-# allowlist keeps the role's blast radius legible at a glance. Services for
-# later phases (secretsmanager, rds, elasticache) are intentionally absent
-# until those phases land; gaps surface as clean AccessDenied errors and get
-# added as one-line, reviewable diffs.
+# allowlist keeps the role's blast radius legible at a glance. Services are
+# added only when a module first needs them; gaps surface as clean
+# AccessDenied errors and land as one-line, reviewable diffs (ecr did exactly
+# this: the first PERSISTENT unit meant the first plan-time refresh against
+# live resources, which needs the service even for a read).
 #
 # apply_enabled = false (prod: plan-on-PR only) — AWS-managed ReadOnlyAccess
 # for resource refresh, plus write access to the S3-native state lockfile
@@ -26,13 +27,17 @@ resource "aws_iam_policy" "apply" {
       Action = [
         "autoscaling:*",
         "ec2:*",
+        "ecr:*",
         "eks:*",
+        "elasticache:*",
         "elasticloadbalancing:*",
         "events:*",
         "iam:*",
         "kms:*",
         "logs:*",
+        "rds:*",
         "s3:*",
+        "secretsmanager:*",
         "sqs:*",
         "ssm:*",
         "sts:*",
