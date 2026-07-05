@@ -14,3 +14,4 @@ one-line caption per image, what the screenshot proves about the design.
 | [secrets/](secrets/) | Secrets Manager + IRSA (ASCP): exact-ARN least-privilege policy, dedicated CMK encryption, CSI tmpfs file mount |
 | [aurora/](aurora/) | Aurora PostgreSQL: Multi-AZ writer + reader, CMK encryption, RDS-managed credential rotation, intra-subnet isolation, force_ssl + live TLS connect |
 | [elasticache/](elasticache/) | ElastiCache Redis: Multi-AZ replication group, at-rest + in-transit encryption, AUTH, intra-subnet isolation, live TLS+AUTH connect |
+| [ecr/](ecr/) | ECR registry + app CI identity: immutable SHA tags, multi-arch manifests, scan-on-push, main-ref-only OIDC trust, publish skipped on PRs, CloudTrail role assumptions |

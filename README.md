@@ -38,7 +38,7 @@ Two principles run through the whole design:
 
 Where it runs: both environments span `ap-northeast-1` (Tokyo, primary) and `ap-northeast-2` (Seoul, DR), a real Asia-Pacific production pair rather than the `us-east-1` tutorial default.
 
-> **Project status.** The platform foundation (networking, EKS + Karpenter, Cilium/Hubble, ArgoCD/GitOps, Secrets Manager + IRSA, the Aurora + ElastiCache data tier, and the full DevSecOps CI pipeline) is **built and evidenced** with console/CLI screenshots under [`docs/screenshots/`](docs/screenshots/). The Go demo application is **implemented with green CI** ([companion repo](https://github.com/RamiroCuenca/eks-platform-demo-app)); its in-cluster deployment, the observability stack, and the autoscaling/load-test work are **designed and on the [Roadmap](#roadmap)**. Every claim in this README traces to a file in the repository or a screenshot in `docs/`.
+> **Project status.** The platform foundation (networking, EKS + Karpenter, Cilium/Hubble, ArgoCD/GitOps, Secrets Manager + IRSA, the Aurora + ElastiCache data tier, the private ECR registry with its OIDC publish identity, and the full DevSecOps CI pipeline) is **built and evidenced** with console/CLI screenshots under [`docs/screenshots/`](docs/screenshots/). The Go demo application is **implemented with green CI, publishing multi-arch images to the platform registry on every merge** ([companion repo](https://github.com/RamiroCuenca/eks-platform-demo-app)); its in-cluster deployment, the observability stack, and the autoscaling/load-test work are **designed and on the [Roadmap](#roadmap)**. Every claim in this README traces to a file in the repository or a screenshot in `docs/`.
 
 ---
 
@@ -326,6 +326,7 @@ Infrastructure is stood up, validated in the AWS console and via `kubectl`, scre
 | Aurora | [`docs/screenshots/aurora/`](docs/screenshots/aurora/) | Writer/reader in separate AZs, CMK storage encryption, 7-day managed rotation, live TLS connect + non-TLS rejection. |
 | ElastiCache | [`docs/screenshots/elasticache/`](docs/screenshots/elasticache/) | Multi-AZ replication group, at-rest + in-transit encryption, intra-subnet placement, live `PING` over TLS+AUTH. |
 | DevSecOps / CI | [`docs/screenshots/ci/`](docs/screenshots/ci/) | OIDC trust + permissions boundary, every gate red→green, CloudTrail `AssumeRoleWithWebIdentity`, branch-protection rulesets, Dependabot PR lifecycle. |
+| ECR + app CI identity | [`docs/screenshots/ecr/`](docs/screenshots/ecr/) | Immutable SHA tags, amd64+arm64 manifests, scan-on-push, main-ref-only trust (publish skipped on PRs), OIDC exchange from both the workflow and CloudTrail sides. |
 
 ---
 
@@ -333,7 +334,7 @@ Infrastructure is stood up, validated in the AWS console and via `kubectl`, scre
 
 The platform foundation is built and evidenced. The following work is **designed and sequenced**, recorded here honestly rather than scattered as inline "in-progress" tags. As each lands, its evidence moves up into the body above.
 
-- **Application deployment.** Wire the implemented [Go service](https://github.com/RamiroCuenca/eks-platform-demo-app) into the cluster: a private ECR repository and the app CI OIDC role (image push + GitOps tag commit-back), the app's IRSA read-grant scoped to the Aurora/Redis connection-secret ARNs, a one-shot DB-init Job that provisions the least-privilege application user, and the gitops manifests (server + worker Deployments, SecretProviderClasses, HPA, KEDA ScaledObject). The application pipeline today runs build/test/Trivy/CodeQL; image publish and GitOps promotion are the next layer.
+- **Application deployment.** Deploy the implemented [Go service](https://github.com/RamiroCuenca/eks-platform-demo-app) into the cluster. The artifact path is built and evidenced: the private ECR registry, the main-ref-only CI publish identity, and the app's per-workload IRSA roles (runtime and DB-init, split so the running app can never read the master credential) all exist, and every merge publishes a multi-arch image ([`docs/screenshots/ecr/`](docs/screenshots/ecr/)). What remains is the gitops layer: server + worker Deployments, SecretProviderClasses, the one-shot DB-init Job that provisions the least-privilege application user, HPA, KEDA ScaledObject, and the CI commit-back that promotes image tags.
 - **Observability.** kube-prometheus-stack (Prometheus + Grafana + Alertmanager) and Loki via ArgoCD; dashboards for cluster health, application SLOs, and cost-by-namespace from AWS tags; Alertmanager rules (CrashLoopBackOff, CPU saturation); Hubble flows surfaced in Grafana.
 - **Autoscaling & load.** HPA (CPU) on the app, KEDA with the Redis-list scaler for the worker, and k6 load tests driving both paths, with pod scale-out, Karpenter node provisioning, and dashboard behaviour under load captured as evidence.
 - **CI-driven dev apply.** Activate apply-on-merge for the dev environment (apply gated to `main` pushes), with the apply run and CloudTrail evidence captured.
