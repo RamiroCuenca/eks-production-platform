@@ -38,7 +38,7 @@ Two principles run through the whole design:
 
 Where it runs: both environments span `ap-northeast-1` (Tokyo, primary) and `ap-northeast-2` (Seoul, DR), a real Asia-Pacific production pair rather than the `us-east-1` tutorial default.
 
-> **Project status.** The platform foundation (networking, EKS + Karpenter, Cilium/Hubble, ArgoCD/GitOps, Secrets Manager + IRSA, the Aurora + ElastiCache data tier, the private ECR registry with its OIDC publish identity, and the full DevSecOps CI pipeline) is **built and evidenced** with console/CLI screenshots under [`docs/screenshots/`](docs/screenshots/). The Go demo application is **implemented with green CI, publishing multi-arch images to the platform registry on every merge** ([companion repo](https://github.com/RamiroCuenca/eks-platform-demo-app)); its in-cluster deployment, the observability stack, and the autoscaling/load-test work are **designed and on the [Roadmap](#roadmap)**. Every claim in this README traces to a file in the repository or a screenshot in `docs/`.
+> **Project status.** The platform foundation (networking, EKS + Karpenter, Cilium/Hubble, ArgoCD/GitOps, Secrets Manager + IRSA, the Aurora + ElastiCache data tier, the private ECR registry with its OIDC publish identity, and the full DevSecOps CI pipeline) is **built and evidenced** with console/CLI screenshots under [`docs/screenshots/`](docs/screenshots/). The Go demo application is **implemented with green CI**: every merge publishes a multi-arch image to the platform registry and promotes its tag into the GitOps repository through an auto-merged, gate-checked pull request ([companion repo](https://github.com/RamiroCuenca/eks-platform-demo-app)); its in-cluster deployment evidence, the observability stack, and the autoscaling/load-test work are **on the [Roadmap](#roadmap)**. Every claim in this README traces to a file in the repository or a screenshot in `docs/`.
 
 ---
 
@@ -93,14 +93,14 @@ flowchart LR
         MANCI["kubeconform · helm lint<br/>Semgrep · Gitleaks"]
     end
     INFRA --> TFCI -->|"AssumeRoleWithWebIdentity"| AWSAPI["AWS APIs"]
-    APPSRC --> APPCI -.->|"image push (roadmap)"| ECR["ECR"]
-    APPCI -.->|"tag commit-back (roadmap)"| GITOPS
+    APPSRC --> APPCI -->|"image push"| ECR["ECR"]
+    APPCI -->|"promotion PR (auto-merged)"| GITOPS
     GITOPS --> MANCI
     GITOPS -->|"continuous reconcile"| ARGOCD["ArgoCD in-cluster"]
     ARGOCD -->|"sync · self-heal · prune"| K8S["EKS workloads"]
 ```
 
-*Dotted edges (ECR image push, GitOps tag commit-back) are the next layer of the application pipeline, see [Roadmap](#roadmap). A higher-fidelity diagram (`docs/architecture.png`) may replace these Mermaid renders in a later pass; the Mermaid versions are version-controlled and need no external tooling.*
+*A higher-fidelity diagram (`docs/architecture.png`) may replace these Mermaid renders in a later pass; the Mermaid versions are version-controlled and need no external tooling.*
 
 ### Highlights
 
@@ -334,7 +334,7 @@ Infrastructure is stood up, validated in the AWS console and via `kubectl`, scre
 
 The platform foundation is built and evidenced. The following work is **designed and sequenced**, recorded here honestly rather than scattered as inline "in-progress" tags. As each lands, its evidence moves up into the body above.
 
-- **Application deployment.** Deploy the implemented [Go service](https://github.com/RamiroCuenca/eks-platform-demo-app) into the cluster. The artifact path is built and evidenced: the private ECR registry, the main-ref-only CI publish identity, and the app's per-workload IRSA roles (runtime and DB-init, split so the running app can never read the master credential) all exist, and every merge publishes a multi-arch image ([`docs/screenshots/ecr/`](docs/screenshots/ecr/)). What remains is the gitops layer: server + worker Deployments, SecretProviderClasses, the one-shot DB-init Job that provisions the least-privilege application user, HPA, KEDA ScaledObject, and the CI commit-back that promotes image tags.
+- **Application deployment evidence.** The full delivery path exists end to end: the private ECR registry, the main-ref-only CI publish identity, the per-workload IRSA roles (runtime and DB-init, split so the running app can never read the master credential), the GitOps manifests (server + worker Deployments, SecretProviderClasses, a wave-ordered DB-init Job provisioning the least-privilege application user, CPU HPA, an FQDN-based Cilium egress policy), and the auto-merged promotion PRs that move the pinned tag on every merge ([`docs/screenshots/ecr/`](docs/screenshots/ecr/)). What remains is running it: a full-stack deployment session capturing the app live against Aurora and Redis, the OWASP ZAP baseline scan against the running service, and the in-cluster evidence set. The KEDA ScaledObject for the worker lands with the autoscaling work below.
 - **Observability.** kube-prometheus-stack (Prometheus + Grafana + Alertmanager) and Loki via ArgoCD; dashboards for cluster health, application SLOs, and cost-by-namespace from AWS tags; Alertmanager rules (CrashLoopBackOff, CPU saturation); Hubble flows surfaced in Grafana.
 - **Autoscaling & load.** HPA (CPU) on the app, KEDA with the Redis-list scaler for the worker, and k6 load tests driving both paths, with pod scale-out, Karpenter node provisioning, and dashboard behaviour under load captured as evidence.
 - **CI-driven dev apply.** Activate apply-on-merge for the dev environment (apply gated to `main` pushes), with the apply run and CloudTrail evidence captured.
