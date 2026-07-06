@@ -84,6 +84,17 @@ locals {
     # ---------- agent (DaemonSet, every node) ----------
     tolerations = [{ operator = "Exists" }]
 
+    # ---------- metrics ----------
+    # Exporters only — agent metrics on :9962 (a named `prometheus` container
+    # port on the DaemonSet). The scrape configs (PodMonitors/ServiceMonitor)
+    # deliberately live in the gitops observability chart: this release
+    # applies at bootstrap on a zero-node cluster, before ArgoCD installs the
+    # monitoring CRDs, so the chart's own serviceMonitor options would fail
+    # every fresh build with "no matches for kind ServiceMonitor".
+    prometheus = {
+      enabled = true
+    }
+
     # ---------- operator (ENI allocator, IRSA) ----------
     serviceAccounts = {
       operator = {
@@ -95,6 +106,14 @@ locals {
     }
     operator = {
       replicas = var.cilium_operator_replicas
+
+      # Operator metrics on :9963 — ENI/IPAM allocation health, which is
+      # exactly the subsystem that broke twice during bootstrap hardening
+      # (region resolution, DescribeRouteTables). Scraped from gitops like
+      # the agent metrics above.
+      prometheus = {
+        enabled = true
+      }
       # Tolerate everything (the chart default), NOT just the system taint. The
       # operator must allocate ENIs before any node can reach Ready, so at
       # bootstrap it has to land on a system node while it is still NotReady —
@@ -132,6 +151,24 @@ locals {
         enabled     = var.hubble_ui_enabled
         tolerations = [local.system_toleration]
         affinity    = local.system_affinity
+      }
+      # Flow metrics on :9965; the chart also creates a headless
+      # `hubble-metrics` Service in kube-system that the gitops
+      # ServiceMonitor targets. Set chosen for the zero-trust story:
+      # `drop` evidences default-deny enforcement, `dns` rides the DNS-proxy
+      # visibility the FQDN policies depend on, the rest baseline the
+      # traffic shape. httpV2 (L7) deliberately omitted — it needs
+      # per-namespace visibility annotations plus an Envoy hop, and the
+      # app's own RED metrics already cover L7.
+      metrics = {
+        enabled = [
+          "dns",
+          "drop",
+          "tcp",
+          "flow",
+          "port-distribution",
+          "icmp",
+        ]
       }
     }
   }
