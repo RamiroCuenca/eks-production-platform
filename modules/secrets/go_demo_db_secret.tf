@@ -5,7 +5,7 @@
 # and provisions the least-privilege database user with it; the runtime app
 # then authenticates as that user, never as master.
 #
-# Same provenance rules as the Phase 5 demo secret: the value is generated,
+# Same provenance rules as the standalone demo secret: the value is generated,
 # never hand-typed or committed, lives only in Terraform state and Secrets
 # Manager, and recovery_window_in_days = 0 keeps teardown symmetric with
 # apply. A real credential would be seeded out-of-band — called out in the

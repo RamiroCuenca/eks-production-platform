@@ -22,7 +22,7 @@ ArgoCD bootstrapped on `eks-platform-dev-ap-northeast-1` (Kubernetes `1.35`, `ap
 | `06c-karpenter-sa-irsa-annotation.png` | Karpenter `ServiceAccount` showing the `eks.amazonaws.com/role-arn` annotation pointing at `karpenter-controller`, the IRSA composition: cluster Secret annotation → Helm values → ServiceAccount annotation → STS AssumeRoleWithWebIdentity. |
 | `07-iam-irsa-trust.png` | IAM → `eks-platform-dev-ap-northeast-1-karpenter-controller` → Trust relationships: federated trust to the cluster OIDC provider with `sub = system:serviceaccount:karpenter:karpenter` and `aud = sts.amazonaws.com`. Closes the IRSA chain end-to-end. |
 
-## Scale-up smoke test (closes the Phase 3 deferred item)
+## Scale-up smoke test
 
 | File | What it proves |
 |---|---|

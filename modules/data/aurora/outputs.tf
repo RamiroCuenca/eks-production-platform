@@ -19,12 +19,12 @@ output "database_name" {
 }
 
 output "master_user_secret_arn" {
-  description = "ARN of the RDS-managed master credential secret (username/password, auto-rotated). The Phase 8 app IRSA policy scopes its read grant to this ARN."
+  description = "ARN of the RDS-managed master credential secret (username/password, auto-rotated). The go-demo db-init IRSA policy scopes its read grant to this ARN."
   value       = aws_rds_cluster.this.master_user_secret[0].secret_arn
 }
 
 output "connection_secret_arn" {
-  description = "ARN of the Terraform-written connection secret (endpoints/port/dbname). The Phase 8 app IRSA policy scopes to this ARN."
+  description = "ARN of the Terraform-written connection secret (endpoints/port/dbname). The go-demo runtime IRSA policy scopes to this ARN."
   value       = aws_secretsmanager_secret.connection.arn
 }
 

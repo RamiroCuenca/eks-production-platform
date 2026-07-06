@@ -14,7 +14,7 @@ output "port" {
 }
 
 output "connection_secret_arn" {
-  description = "ARN of the connection/AUTH secret. The Phase 8 app IRSA policy scopes its read grant to this ARN."
+  description = "ARN of the connection/AUTH secret. The go-demo runtime IRSA policy scopes its read grant to this ARN."
   value       = aws_secretsmanager_secret.connection.arn
 }
 

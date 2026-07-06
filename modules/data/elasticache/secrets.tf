@@ -17,7 +17,7 @@ resource "random_password" "auth" {
 # Unlike Aurora (whose credentials are RDS-managed), ElastiCache has no managed
 # secret, so the AUTH token is generated here and stored alongside the
 # endpoints. Encrypted with the module CMK; recovery_window_in_days = 0 for
-# symmetric teardown (matches Aurora and the Phase 5 demo secret).
+# symmetric teardown (matches Aurora and the standalone demo secret).
 resource "aws_secretsmanager_secret" "connection" {
   name        = local.connection_secret_name
   description = "Redis connection details (endpoints, port) + AUTH token for the demo app."

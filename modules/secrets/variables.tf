@@ -59,7 +59,7 @@ variable "demo_service_account" {
 # ---------- Go demo workload identity (must match the gitops go-demo chart) ----------
 
 variable "go_demo_service_account" {
-  description = "ServiceAccount the Go demo app (server + worker Deployments) runs as. The runtime IRSA role's trust policy pins to it. Lives in demo_namespace alongside the Phase 5 demo workload."
+  description = "ServiceAccount the Go demo app (server + worker Deployments) runs as. The runtime IRSA role's trust policy pins to it. Lives in demo_namespace alongside the secrets-demo workload."
   type        = string
   default     = "go-demo"
 }

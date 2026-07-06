@@ -6,7 +6,7 @@ locals {
 # CREDENTIALS are deliberately NOT here — they live in the RDS-managed master
 # secret (manage_master_user_password). Endpoints are not sensitive, but keeping
 # them in Secrets Manager lets the app retrieve everything through the same
-# IRSA/ASCP mount path already built in Phase 5, rather than mixing a secret
+# IRSA/ASCP mount path the secrets module already provides, rather than mixing a secret
 # mount with injected env-vars. Encrypted with the module CMK.
 resource "aws_secretsmanager_secret" "connection" {
   name        = local.connection_secret_name
@@ -14,7 +14,7 @@ resource "aws_secretsmanager_secret" "connection" {
   kms_key_id  = aws_kms_key.aurora.arn
 
   # recovery_window_in_days = 0 keeps teardown symmetric with apply (matches the
-  # state bucket force_destroy and the Phase 5 demo secret): without it a
+  # state bucket force_destroy and the standalone demo secret): without it a
   # re-apply inside the recovery window fails with "scheduled for deletion".
   recovery_window_in_days = 0
 }
