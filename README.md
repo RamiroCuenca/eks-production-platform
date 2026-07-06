@@ -38,7 +38,7 @@ Two principles run through the whole design:
 
 Where it runs: both environments span `ap-northeast-1` (Tokyo, primary) and `ap-northeast-2` (Seoul, DR), a real Asia-Pacific production pair rather than the `us-east-1` tutorial default.
 
-> **Project status.** The platform foundation (networking, EKS + Karpenter, Cilium/Hubble, ArgoCD/GitOps, Secrets Manager + IRSA, the Aurora + ElastiCache data tier, the private ECR registry with its OIDC publish identity, and the full DevSecOps CI pipeline) is **built and evidenced** with console/CLI screenshots under [`docs/screenshots/`](docs/screenshots/). The Go demo application is **implemented with green CI**: every merge publishes a multi-arch image to the platform registry and promotes its tag into the GitOps repository through an auto-merged, gate-checked pull request ([companion repo](https://github.com/RamiroCuenca/eks-platform-demo-app)); its in-cluster deployment evidence, the observability stack, and the autoscaling/load-test work are **on the [Roadmap](#roadmap)**. Every claim in this README traces to a file in the repository or a screenshot in `docs/`.
+> **Project status.** The platform foundation (networking, EKS + Karpenter, Cilium/Hubble, ArgoCD/GitOps, Secrets Manager + IRSA, the Aurora + ElastiCache data tier, the private ECR registry with its OIDC publish identity, and the full DevSecOps CI pipeline) is **built and evidenced** with console/CLI screenshots under [`docs/screenshots/`](docs/screenshots/). The Go demo application is **implemented with green CI**: every merge publishes a multi-arch image to the platform registry and promotes its tag into the GitOps repository through an auto-merged, gate-checked pull request ([companion repo](https://github.com/RamiroCuenca/eks-platform-demo-app)); The observability stack (kube-prometheus-stack, Loki/Alloy, dashboards and alert rules as code) and the autoscaling work (KEDA queue-depth scaling with scale-to-zero, in-cluster k6 load profiles) are **implemented and CI-validated in the GitOps and application repositories**; the composed live-deployment session that captures their runtime evidence — together with the app's in-cluster evidence and the OWASP ZAP baseline — is what remains on the [Roadmap](#roadmap). Every claim in this README traces to a file in the repository or a screenshot in `docs/`.
 
 ---
 
@@ -144,8 +144,10 @@ The rule of thumb: *if it requires AWS credentials to create → Terraform, infr
 | Cache | **ElastiCache Redis** (Multi-AZ) | Replication group with automatic failover, at-rest (CMK) + in-transit (TLS) encryption, and AUTH. |
 | Demo workload | **Go** microservice, *implemented; deployment evidence pending* | Dependency-light stdlib HTTP service + queue worker on a distroless non-root image. [Source + CI ↗](https://github.com/RamiroCuenca/eks-platform-demo-app) [![ci](https://github.com/RamiroCuenca/eks-platform-demo-app/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RamiroCuenca/eks-platform-demo-app/actions/workflows/ci.yml) [![codeql](https://github.com/RamiroCuenca/eks-platform-demo-app/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/RamiroCuenca/eks-platform-demo-app/actions/workflows/codeql.yml) |
 | CI/CD | **GitHub Actions** (OIDC to AWS) | Short-lived role-assumed credentials, no static keys; SHA-pinned actions; strict-fail security gates. |
-| Load testing | **k6**, *designed; see Roadmap* | JS-scripted load with results streamed to Grafana to visualise scaling. |
-| Observability | **kube-prometheus-stack + Loki**, *designed; see Roadmap* | Metrics, logs, alerting, and a cost-by-namespace FinOps panel. |
+| Autoscaling (workload) | **HPA + KEDA**, *implemented; live evidence pending* | Signal-matched scaling: CPU HPA for the request-proportional HTTP path, KEDA's Redis-list scaler (scale-to-zero) for the queue worker. |
+| Load testing | **k6**, *implemented; live evidence pending* | JS-scripted profiles running as hardened in-cluster Jobs; pass thresholds identical to the Prometheus alert thresholds. |
+| Observability | **kube-prometheus-stack + Loki + Alloy**, *implemented; live evidence pending* | Metrics, logs, alerting and dashboards-as-code, delivered through ArgoCD; Cilium/Hubble flow metrics wired into Grafana. |
+| Persistent storage | **EBS CSI driver** (managed addon, IRSA) | Explicitly-referenced encrypted gp3 StorageClass with topology-aware binding; no workload depends on a cluster default. |
 
 ---
 
@@ -306,7 +308,7 @@ The "considered and rejected" list is as much a part of the design as the tools 
 | **Security** | IRSA least-privilege, customer-managed KMS at every layer, access entries, OIDC-federated CI with a permissions boundary, intra-subnet data isolation, default-deny network policy. |
 | **Reliability** | Multi-AZ across the board (NAT, EKS nodes, Aurora, Redis); topology-symmetric dev for DR validation; spot interruption draining; ArgoCD self-heal. |
 | **Performance efficiency** | eBPF datapath (no iptables/kube-proxy scaling cliff); Karpenter right-sizing and bin-packing; Graviton instances. |
-| **Cost optimisation** | Spot-first compute, per-AZ-but-bounded NAT, utility-sized VPC endpoints, build→screenshot→destroy lifecycle, a planned cost-by-namespace Grafana panel. |
+| **Cost optimisation** | Spot-first compute, per-AZ-but-bounded NAT, utility-sized VPC endpoints, build→screenshot→destroy lifecycle, observability retention sized to that lifecycle. Cost-by-namespace dashboards were considered and deferred to an OpenCost integration — resource panels relabeled as dollars would misinform. |
 | **Operational excellence** | Every change is a reviewed PR; full control-plane + VPC flow logging; decisions documented with alternatives; clean single-apply bootstrap with no imperative steps. |
 | **Sustainability** | Graviton (lower power per watt) as the default architecture; aggressive consolidation reduces idle capacity. |
 
@@ -334,10 +336,12 @@ Infrastructure is stood up, validated in the AWS console and via `kubectl`, scre
 
 The platform foundation is built and evidenced. The following work is **designed and sequenced**, recorded here honestly rather than scattered as inline "in-progress" tags. As each lands, its evidence moves up into the body above.
 
-- **Application deployment evidence.** The full delivery path exists end to end: the private ECR registry, the main-ref-only CI publish identity, the per-workload IRSA roles (runtime and DB-init, split so the running app can never read the master credential), the GitOps manifests (server + worker Deployments, SecretProviderClasses, a wave-ordered DB-init Job provisioning the least-privilege application user, CPU HPA, an FQDN-based Cilium egress policy), and the auto-merged promotion PRs that move the pinned tag on every merge ([`docs/screenshots/ecr/`](docs/screenshots/ecr/)). What remains is running it: a full-stack deployment session capturing the app live against Aurora and Redis, the OWASP ZAP baseline scan against the running service, and the in-cluster evidence set. The KEDA ScaledObject for the worker lands with the autoscaling work below.
-- **Observability.** kube-prometheus-stack (Prometheus + Grafana + Alertmanager) and Loki via ArgoCD; dashboards for cluster health, application SLOs, and cost-by-namespace from AWS tags; Alertmanager rules (CrashLoopBackOff, CPU saturation); Hubble flows surfaced in Grafana.
-- **Autoscaling & load.** HPA (CPU) on the app, KEDA with the Redis-list scaler for the worker, and k6 load tests driving both paths, with pod scale-out, Karpenter node provisioning, and dashboard behaviour under load captured as evidence.
+- **Composed live-deployment evidence.** Everything below exists as merged, CI-validated code; what remains is one full-stack deployment session that exercises and screenshots it layer by layer:
+  - *Application path* — the app live against Aurora and Redis (delivery chain already evidenced at [`docs/screenshots/ecr/`](docs/screenshots/ecr/)), plus the OWASP ZAP baseline scan against the running service.
+  - *Observability* — Grafana dashboards (app SLOs, Hubble network view) with real traffic, Loki logs via Alloy, an Alertmanager rule observed firing, Prometheus targets healthy through the default-deny scrape allows.
+  - *Autoscaling & load* — the in-cluster k6 profiles driving both paths: HPA scale-out with Karpenter node provisioning on the HTTP path, and the KEDA worker waking from zero on Redis queue depth, then draining back down.
 - **CI-driven dev apply.** Activate apply-on-merge for the dev environment (apply gated to `main` pushes), with the apply run and CloudTrail evidence captured.
+- **Operational runbooks.** Written against the live observability evidence from the session above, not speculatively before it.
 
 ---
 
