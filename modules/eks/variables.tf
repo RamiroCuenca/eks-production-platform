@@ -118,6 +118,12 @@ variable "coredns_addon_version" {
   default     = ""
 }
 
+variable "ebs_csi_addon_version" {
+  description = "Optional pinned version for the aws-ebs-csi-driver managed addon. Empty string lets EKS pick the default-compatible version, same policy as CoreDNS."
+  type        = string
+  default     = ""
+}
+
 # ---------- Karpenter AWS scaffolding ----------
 
 variable "karpenter_namespace" {
