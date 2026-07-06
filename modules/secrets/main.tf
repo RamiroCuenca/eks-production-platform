@@ -1,6 +1,6 @@
 locals {
   # Hierarchical, env-scoped secret name. A standalone demo credential,
-  # deliberately namespaced away from the real Aurora-managed secret Phase 6
+  # deliberately namespaced away from the real Aurora-managed secret the data tier
   # writes so the two never collide. The region is implied (secrets are
   # regional); env in the path keeps dev and prod distinct and self-describing.
   demo_secret_name = "eks-platform/${var.environment}/demo-app/credentials"
