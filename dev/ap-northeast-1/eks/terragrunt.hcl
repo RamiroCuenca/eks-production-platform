@@ -20,4 +20,14 @@ dependency "network" {
 inputs = {
   vpc_id             = dependency.network.outputs.vpc_id
   private_subnet_ids = dependency.network.outputs.private_subnet_ids
+
+  # CI plans and applies run as the ci-dev OIDC role; units that manage
+  # in-cluster resources (argocd, addons) need it to reach the K8s API.
+  # Cluster-admin because apply manages helm releases, namespaces and secrets.
+  additional_access_entries = {
+    ci_dev = {
+      role_name  = "eks-platform-ci-dev"
+      policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+    }
+  }
 }
