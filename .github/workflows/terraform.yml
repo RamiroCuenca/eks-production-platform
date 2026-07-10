@@ -10,6 +10,9 @@
 # (modules/, root.hcl, global.hcl) plan every unit, since any of them may
 # consume it.
 #
+# Merges to main can additionally apply the dev environment, gated behind
+# the DEV_APPLY_ENABLED repository variable — see the apply-dev job.
+#
 # Tools install as version- and checksum-pinned release binaries; the few
 # unavoidable actions are pinned to commit SHAs, not tags.
 name: terraform
@@ -24,7 +27,9 @@ permissions:
 
 concurrency:
   group: terraform-${{ github.ref }}
-  cancel-in-progress: true
+  # Superseded PR runs are safe to cancel; push-to-main runs may be mid-apply
+  # and must never be — a second merge queues behind the group instead.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   TF_VERSION: 1.15.1
@@ -219,6 +224,50 @@ jobs:
             args+=(--queue-include-dir "$unit")
           done
           terragrunt run --all --queue-strict-include "${args[@]}" -- plan -lock-timeout=5m
+
+  apply-dev:
+    name: apply (dev)
+    needs: [validate, trivy]
+    # Merge-triggered applies are opt-in via the DEV_APPLY_ENABLED repo
+    # variable. The kill-switch exists because dev is built and torn down on
+    # demand — with it off, a merge while the environment is down stays a
+    # no-op instead of rebuilding the full stack from empty state on CI
+    # credentials. When enabled, the job reconciles all of dev, not just
+    # changed units: main is the desired state, drift included.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEV_APPLY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install terraform
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/terraform.zip" \
+            "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip"
+          echo "${TF_SHA256}  $RUNNER_TEMP/terraform.zip" | sha256sum -c -
+          unzip -o -q "$RUNNER_TEMP/terraform.zip" -d "$RUNNER_TEMP/bin"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Install terragrunt
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -sSfL -o "$RUNNER_TEMP/bin/terragrunt" \
+            "https://github.com/gruntwork-io/terragrunt/releases/download/v${TG_VERSION}/terragrunt_linux_amd64"
+          echo "${TG_SHA256}  $RUNNER_TEMP/bin/terragrunt" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/bin/terragrunt"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Assume ci-dev via OIDC
+        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6.2.1
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/eks-platform-ci-dev
+          aws-region: ap-northeast-1
+
+      - name: Terragrunt apply (all dev units)
+        working-directory: dev/ap-northeast-1
+        run: terragrunt run --all apply -- -lock-timeout=5m
 
   trivy:
     name: trivy config
