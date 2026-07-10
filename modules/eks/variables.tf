@@ -52,10 +52,10 @@ variable "operator_iam_arn" {
 }
 
 variable "additional_access_entries" {
-  description = "Extra IAM-to-cluster bindings. Keyed by an arbitrary stable name. Each entry maps an IAM principal to one AWS-managed EKS access policy at cluster scope. Populated in later phases (GitHub Actions OIDC role)."
+  description = "Extra IAM-to-cluster bindings. Keyed by an arbitrary stable name. Each entry maps an IAM role in this account (by name, so callers never hardcode the account ID) to one AWS-managed EKS access policy at cluster scope. Populated in later phases (GitHub Actions OIDC role)."
   type = map(object({
-    principal_arn = string
-    policy_arn    = string
+    role_name  = string
+    policy_arn = string
   }))
   default = {}
 }
@@ -120,6 +120,12 @@ variable "coredns_addon_version" {
 
 variable "ebs_csi_addon_version" {
   description = "Optional pinned version for the aws-ebs-csi-driver managed addon. Empty string lets EKS pick the default-compatible version, same policy as CoreDNS."
+  type        = string
+  default     = ""
+}
+
+variable "metrics_server_addon_version" {
+  description = "Optional pinned version for the metrics-server managed addon. Empty string lets EKS pick the default-compatible version, same policy as CoreDNS."
   type        = string
   default     = ""
 }
