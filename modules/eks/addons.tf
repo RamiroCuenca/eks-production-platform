@@ -95,3 +95,50 @@ resource "aws_eks_addon" "ebs_csi" {
 
   depends_on = [aws_eks_node_group.system]
 }
+
+# metrics-server — serves the resource-metrics API (metrics.k8s.io) behind
+# `kubectl top` and, critically, every Resource-type HPA: the go-demo server
+# scales on CPU utilization, and utilization is computed from this API.
+# Nothing else on the cluster provides it — kube-prometheus-stack feeds
+# Grafana/alerting (no prometheus-adapter installed), and KEDA registers only
+# the *external* metrics API for its scalers. Without this addon a CPU HPA
+# reads <unknown> forever and never scales.
+#
+# Managed addon for the same reasons as CoreDNS, and pinned to the system tier
+# like the EBS CSI controller: an HPA evaluating against a metrics backend
+# that restarts whenever Karpenter consolidates a node would stall exactly
+# when scaling decisions matter most — mid-load.
+
+resource "aws_eks_addon" "metrics_server" {
+  cluster_name  = aws_eks_cluster.this.name
+  addon_name    = "metrics-server"
+  addon_version = var.metrics_server_addon_version != "" ? var.metrics_server_addon_version : null
+
+  configuration_values = jsonencode({
+    tolerations = [
+      {
+        key      = "node-tier"
+        operator = "Equal"
+        value    = "system"
+        effect   = "NoSchedule"
+      },
+    ]
+    affinity = {
+      nodeAffinity = {
+        requiredDuringSchedulingIgnoredDuringExecution = {
+          nodeSelectorTerms = [{
+            matchExpressions = [{
+              key      = "karpenter.sh/nodepool"
+              operator = "DoesNotExist"
+            }]
+          }]
+        }
+      }
+    }
+  })
+
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  depends_on = [aws_eks_node_group.system]
+}

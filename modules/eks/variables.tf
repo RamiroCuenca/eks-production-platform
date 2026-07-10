@@ -124,6 +124,12 @@ variable "ebs_csi_addon_version" {
   default     = ""
 }
 
+variable "metrics_server_addon_version" {
+  description = "Optional pinned version for the metrics-server managed addon. Empty string lets EKS pick the default-compatible version, same policy as CoreDNS."
+  type        = string
+  default     = ""
+}
+
 # ---------- Karpenter AWS scaffolding ----------
 
 variable "karpenter_namespace" {
