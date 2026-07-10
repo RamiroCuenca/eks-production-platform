@@ -39,7 +39,7 @@ resource "aws_eks_access_entry" "additional" {
   for_each = var.additional_access_entries
 
   cluster_name  = aws_eks_cluster.this.name
-  principal_arn = each.value.principal_arn
+  principal_arn = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:role/${each.value.role_name}"
   type          = "STANDARD"
 }
 

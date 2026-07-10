@@ -26,8 +26,8 @@ inputs = {
   # Cluster-admin because apply manages helm releases, namespaces and secrets.
   additional_access_entries = {
     ci_dev = {
-      principal_arn = "arn:aws:iam::${get_aws_account_id()}:role/eks-platform-ci-dev"
-      policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+      role_name  = "eks-platform-ci-dev"
+      policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
     }
   }
 }
