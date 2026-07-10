@@ -19,7 +19,8 @@ A production-grade Amazon EKS platform built with Terragrunt, Cilium, ArgoCD, an
 - [DevSecOps pipeline](#devsecops-pipeline)
 - [AWS Well-Architected alignment](#aws-well-architected-alignment)
 - [Deployment evidence](#deployment-evidence)
-- [Roadmap](#roadmap)
+- [Operational runbooks](#operational-runbooks)
+- [Possible extensions](#possible-extensions)
 - [Repository layout](#repository-layout)
 - [Deploy from zero](#deploy-from-zero)
 - [Cost & lifecycle](#cost--lifecycle)
@@ -38,7 +39,7 @@ Two principles run through the whole design:
 
 Where it runs: both environments span `ap-northeast-1` (Tokyo, primary) and `ap-northeast-2` (Seoul, DR), a real Asia-Pacific production pair rather than the `us-east-1` tutorial default.
 
-> **Project status.** The platform foundation (networking, EKS + Karpenter, Cilium/Hubble, ArgoCD/GitOps, Secrets Manager + IRSA, the Aurora + ElastiCache data tier, the private ECR registry with its OIDC publish identity, and the full DevSecOps CI pipeline) is **built and evidenced** with console/CLI screenshots under [`docs/screenshots/`](docs/screenshots/). The Go demo application is **implemented with green CI**: every merge publishes a multi-arch image to the platform registry and promotes its tag into the GitOps repository through an auto-merged, gate-checked pull request ([companion repo](https://github.com/RamiroCuenca/eks-platform-demo-app)); The observability stack (kube-prometheus-stack, Loki/Alloy, dashboards and alert rules as code) and the autoscaling work (KEDA queue-depth scaling with scale-to-zero, in-cluster k6 load profiles) are **implemented and CI-validated in the GitOps and application repositories**; the composed live-deployment session that captures their runtime evidence — together with the app's in-cluster evidence and the OWASP ZAP baseline — is what remains on the [Roadmap](#roadmap). Every claim in this README traces to a file in the repository or a screenshot in `docs/`.
+> **Project status.** The platform is **built and evidenced end to end** with console/CLI screenshots under [`docs/screenshots/`](docs/screenshots/): networking, EKS + Karpenter, Cilium/Hubble, ArgoCD/GitOps, Secrets Manager + IRSA, the Aurora + ElastiCache data tier, the private ECR registry with its OIDC publish identity, and the full DevSecOps CI pipeline. The Go demo application ([companion repo](https://github.com/RamiroCuenca/eks-platform-demo-app)) is evidenced **running live** against the data tier ([`app/`](docs/screenshots/app/)) — including an OWASP ZAP baseline against the running service — alongside the observability stack with an alert observed firing ([`observability/`](docs/screenshots/observability/)) and both autoscaling paths exercised under k6 load ([`loadtest/`](docs/screenshots/loadtest/)). Every claim in this README traces to a file in the repository or a screenshot in `docs/`.
 
 ---
 
@@ -142,11 +143,11 @@ The rule of thumb: *if it requires AWS credentials to create → Terraform, infr
 | Secrets | **Secrets Manager + IRSA + ASCP** | Per-workload IAM scoped to the exact secret ARN; values delivered as a tmpfs CSI mount, never synced into etcd. |
 | Database | **Aurora PostgreSQL** (Multi-AZ) | Writer + reader in separate AZs; RDS-managed credential rotation; server-enforced TLS. |
 | Cache | **ElastiCache Redis** (Multi-AZ) | Replication group with automatic failover, at-rest (CMK) + in-transit (TLS) encryption, and AUTH. |
-| Demo workload | **Go** microservice, *implemented; deployment evidence pending* | Dependency-light stdlib HTTP service + queue worker on a distroless non-root image. [Source + CI ↗](https://github.com/RamiroCuenca/eks-platform-demo-app) [![ci](https://github.com/RamiroCuenca/eks-platform-demo-app/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RamiroCuenca/eks-platform-demo-app/actions/workflows/ci.yml) [![codeql](https://github.com/RamiroCuenca/eks-platform-demo-app/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/RamiroCuenca/eks-platform-demo-app/actions/workflows/codeql.yml) |
+| Demo workload | **Go** microservice | Dependency-light stdlib HTTP service + queue worker on a distroless non-root image. [Source + CI ↗](https://github.com/RamiroCuenca/eks-platform-demo-app) [![ci](https://github.com/RamiroCuenca/eks-platform-demo-app/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RamiroCuenca/eks-platform-demo-app/actions/workflows/ci.yml) [![codeql](https://github.com/RamiroCuenca/eks-platform-demo-app/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/RamiroCuenca/eks-platform-demo-app/actions/workflows/codeql.yml) |
 | CI/CD | **GitHub Actions** (OIDC to AWS) | Short-lived role-assumed credentials, no static keys; SHA-pinned actions; strict-fail security gates. |
-| Autoscaling (workload) | **HPA + KEDA**, *implemented; live evidence pending* | Signal-matched scaling: CPU HPA for the request-proportional HTTP path (resource metrics served by the managed metrics-server addon), KEDA's Redis-list scaler (scale-to-zero) for the queue worker. |
-| Load testing | **k6**, *implemented; live evidence pending* | JS-scripted profiles running as hardened in-cluster Jobs; pass thresholds identical to the Prometheus alert thresholds. |
-| Observability | **kube-prometheus-stack + Loki + Alloy**, *implemented; live evidence pending* | Metrics, logs, alerting and dashboards-as-code, delivered through ArgoCD; Cilium/Hubble flow metrics wired into Grafana. |
+| Autoscaling (workload) | **HPA + KEDA** | Signal-matched scaling: CPU HPA for the request-proportional HTTP path (resource metrics served by the managed metrics-server addon), KEDA's Redis-list scaler (scale-to-zero) for the queue worker. |
+| Load testing | **k6** | JS-scripted profiles running as hardened in-cluster Jobs; pass thresholds identical to the Prometheus alert thresholds. |
+| Observability | **kube-prometheus-stack + Loki + Alloy** | Metrics, logs, alerting and dashboards-as-code, delivered through ArgoCD; Cilium/Hubble flow metrics wired into Grafana. |
 | Persistent storage | **EBS CSI driver** (managed addon, IRSA) | Explicitly-referenced encrypted gp3 StorageClass with topology-aware binding; no workload depends on a cluster default. |
 
 ---
@@ -277,12 +278,15 @@ A layered set of gates runs across all three repositories. **Every gate is stric
 | IaC validity | **terraform fmt/validate**, **terragrunt hclvalidate**, scoped **`run --all plan`** | Format, validate, changed-unit plan | infra |
 | Manifest schema | **kubeconform** | Validated against the exact K8s version the clusters run + CRD schemas from the community catalog | gitops |
 | Chart rendering | **helm lint --strict** + **helm template \| kubeconform** | Rendered-output validation (with `pipefail` so a failed render can't pass vacuously) | gitops |
+| DAST | **OWASP ZAP** (baseline) | Passive scan against the live in-cluster service — **66 pass / 1 low-severity warn / 0 fail** ([evidence](docs/screenshots/app/)). Run per deployment session rather than in CI: the environment is transient by design, so there is no standing endpoint for a scheduled scan to target. | app (live service) |
 | Supply chain | **Dependabot** | Grouped weekly updates; bumps held to the same branch-protection bar as human PRs | all |
 | Federation | **GitHub OIDC** | Short-lived `AssumeRoleWithWebIdentity`, no static keys | infra, app |
 
-Order matters: secrets are caught before any build, SAST before image build, image scan before push, and (planned) DAST after deploy. Running overlapping scanners with different rule coverage has already paid off concretely: Semgrep's `p/terraform` flagged a default-open `map_public_ip_on_launch` on public subnets that the Trivy config scan had not caught.
+Order matters: secrets are caught before any build, SAST before image build, image scan before push, and DAST after deploy. Running overlapping scanners with different rule coverage has already paid off concretely: Semgrep's `p/terraform` flagged a default-open `map_public_ip_on_launch` on public subnets that the Trivy config scan had not caught.
 
 > **A gate that actually blocks.** The application's container-scan gate failed its first run on real CVEs (a CRITICAL in the Postgres driver plus HIGH findings in `golang.org/x/crypto` and the Go stdlib) and went green only after the dependencies and build toolchain were bumped; the red→green history is visible in the app repo's [Actions runs](https://github.com/RamiroCuenca/eks-platform-demo-app/actions). The infra pipeline's gates were likewise proven on real findings, captured in [`docs/screenshots/ci/`](docs/screenshots/ci/).
+
+Beyond gating, the pipeline can deliver: merges to `main` apply the dev environment through the same OIDC-federated `ci-dev` role (`terragrunt run --all apply` across the environment — main is the desired state, drift included), behind a repository-variable kill-switch. The environment is built and torn down on demand, so with the switch off a merge stays a visible no-op (the job reports Skipped) instead of rebuilding the full stack from empty state on CI credentials; push-to-main runs are exempt from concurrency cancellation so a second merge can never kill a mid-flight apply.
 
 ### Scanners we evaluated and deliberately deferred
 
@@ -294,7 +298,6 @@ The "considered and rejected" list is as much a part of the design as the tools 
 | **SonarQube / SonarCloud** | Enterprise-Java-shaped, heavy hosting model, strongest in Java/JS, weak fit for an HCL + YAML + Go-microservice stack. Semgrep's purpose-built rulesets are the better fit. |
 | **tfsec / checkov** | tfsec was deprecated and folded *into* Trivy by Aqua, citing it separately is a stale-tool smell. checkov would be a second IaC scanner for coverage Trivy already provides. |
 | **trufflehog** | Higher-fidelity findings but a much noisier first run on fresh repos; the triage cost isn't justified when Gitleaks covers the need cleanly. |
-| **OWASP ZAP (DAST)** | A post-deploy concern that belongs with the application's live deployment, landing alongside it (see [Roadmap](#roadmap)). |
 | **kube-score** | Schema correctness is kubeconform's job and Kubernetes security smells are Semgrep's `p/kubernetes`; a third opinionated linter adds gate-maintenance cost without a new failure class at this manifest count. |
 | **Per-region CI IAM roles** | Region scoping is enforced by the permissions boundary's `aws:RequestedRegion` condition; per-region roles would double IAM management for no incremental blast-radius gain. |
 | **Prod apply-via-CI** | Appropriate for a continuously-applied production environment, not a build-screenshot-destroy portfolio; prod plans run in CI, prod applies stay operator-local. |
@@ -329,19 +332,43 @@ Infrastructure is stood up, validated in the AWS console and via `kubectl`, scre
 | ElastiCache | [`docs/screenshots/elasticache/`](docs/screenshots/elasticache/) | Multi-AZ replication group, at-rest + in-transit encryption, intra-subnet placement, live `PING` over TLS+AUTH. |
 | DevSecOps / CI | [`docs/screenshots/ci/`](docs/screenshots/ci/) | OIDC trust + permissions boundary, every gate red→green, CloudTrail `AssumeRoleWithWebIdentity`, branch-protection rulesets, Dependabot PR lifecycle. |
 | ECR + app CI identity | [`docs/screenshots/ecr/`](docs/screenshots/ecr/) | Immutable SHA tags, amd64+arm64 manifests, scan-on-push, main-ref-only trust (publish skipped on PRs), OIDC exchange from both the workflow and CloudTrail sides. |
+| Application runtime | [`docs/screenshots/app/`](docs/screenshots/app/) | Live service against Aurora + Redis (TLS both ways), wave-ordered db-init with a CONNECT-only role, tmpfs secret mounts on a distroless image, Hubble-attributed FQDN egress, ZAP baseline 66/1/0. |
+| Observability | [`docs/screenshots/observability/`](docs/screenshots/observability/) | Prometheus targets UP through default-deny namespaces, SLO / Hubble / fleet dashboards under live traffic, Loki log streams via Alloy, `WorkloadPodRestartStorm` observed firing. |
+| Autoscaling & load | [`docs/screenshots/loadtest/`](docs/screenshots/loadtest/) | HPA 2→10 with Karpenter provisioning just-in-time capacity at ~1,851 req/s (0% failed, p95 8.95 ms), and the KEDA worker's full 0→10→0 lifecycle on Redis queue depth. |
 
 ---
 
-## Roadmap
+## Operational runbooks
 
-The platform foundation is built and evidenced. The following work is **designed and sequenced**, recorded here honestly rather than scattered as inline "in-progress" tags. As each lands, its evidence moves up into the body above.
+Triage paths for the alert rules defined in the [GitOps repo](https://github.com/RamiroCuenca/eks-platform-gitops), written against behavior observed on the live deployment — every dashboard, flow view and scale event referenced below is the one evidenced in [Deployment evidence](#deployment-evidence).
 
-- **Composed live-deployment evidence.** Everything below exists as merged, CI-validated code; what remains is one full-stack deployment session that exercises and screenshots it layer by layer:
-  - *Application path* — the app live against Aurora and Redis (delivery chain already evidenced at [`docs/screenshots/ecr/`](docs/screenshots/ecr/)), plus the OWASP ZAP baseline scan against the running service.
-  - *Observability* — Grafana dashboards (app SLOs, Hubble network view) with real traffic, Loki logs via Alloy, an Alertmanager rule observed firing, Prometheus targets healthy through the default-deny scrape allows.
-  - *Autoscaling & load* — the in-cluster k6 profiles driving both paths: HPA scale-out with Karpenter node provisioning on the HTTP path, and the KEDA worker waking from zero on Redis queue depth, then draining back down.
-- **CI-driven dev apply.** Activate apply-on-merge for the dev environment (apply gated to `main` pushes), with the apply run and CloudTrail evidence captured.
-- **Operational runbooks.** Written against the live observability evidence from the session above, not speculatively before it.
+### `GoDemoHighErrorRate` / `GoDemoP95LatencyHigh`
+
+1. Open the `go-demo / Service SLOs` dashboard: isolate which route is degrading and whether it's a 5xx problem or a latency problem. Check the HPA panel — desired pinned above available means saturation, not application fault.
+2. Correlate with the last image promotion in the GitOps repo. If the degradation starts at a promotion, revert that auto-merged promotion PR — ArgoCD reconciles the previous image tag within one sync interval; no imperative rollback.
+3. No recent deploy → check the Hubble network dashboard for `DROP` verdicts toward the data tier (`:5432`/`:6379`): a policy regression or data-tier failure shows up as drops before application logs make it obvious. Confirm the app-side story in Loki (`{namespace="demo"}`).
+
+### `WorkloadPodRestartStorm`
+
+1. `kubectl -n demo get pods` — identify the restarting deployment. The images are distroless with no shell, so triage happens from the outside, not via `exec`.
+2. Loki, `{namespace="demo"}` filtered to the pod, in this order: db-init ordering (the server starting before the wave-ordered init Job finished), secret-mount failure (no `SecretProviderClassPodStatus` for the pod → CSI driver / IRSA path), then probe failures under CPU throttling.
+3. The rule → Alertmanager path is known-good: it was validated by observing this alert fire against a deliberately crash-looping pod. Silence only with a linked issue.
+
+### `NodeCPUUtilizationHigh`
+
+1. Fleet dashboard: one node or fleet-wide, and which tier — the system node group (controllers, observability) or Karpenter capacity (workloads)?
+2. Workload tier with HPA at `maxReplicas`: the service has outgrown its configured ceiling — raise it in the GitOps repo; Karpenter provisions capacity to fit, so node size is not the lever.
+3. Karpenter not adding nodes: check NodePool CPU limits. Healthy behavior is provisioning within seconds of unschedulable pods (observed during the load test); a quiet Karpenter with Pending pods almost always means a limits ceiling.
+
+---
+
+## Possible extensions
+
+The platform is complete for its purpose; these are genuine extensions, not deferred gaps:
+
+- **OpenCost** — cost-by-namespace dashboards; deferred deliberately rather than relabeling resource panels as dollars (see [Well-Architected](#aws-well-architected-alignment)).
+- **Progressive delivery** — Argo Rollouts canarying the image-promotion PRs, using the same SLO metrics the alerts already judge by.
+- **Prod bring-up** — the prod tree is topology-symmetric and already coded (environment-gated CI plans, API allowlisting); a bring-up session would exercise the approval-gated prod path end to end.
 
 ---
 
